@@ -17,8 +17,8 @@ The plan is in BUILD_PROMPT.md (phases 0 to 9). Rules for every session are in C
 | 3 | extraction (src/extractor.py) | done | 41,264 files: 40,651 parsed, 613 failed (all no To header); 11 cp1252, 1,165 quoted-printable, 1 header repair; body_basis 37,154 authored / 3,420 forwarded / 77 quoted; has_attachment 16.3%, headings 1.9%; dates 1980-01-01 (bogus) to 2002-07-12 | 770aaad |
 | 4 | database (schema.sql, src/database.py, sample_queries.sql) | done | load 1: 40,651 emails, 7,799 addresses, 179,245 recipient rows; load 2: 0 added, 40,651 skipped, 0 conflicts; FK and integrity checks clean | a0f9820 |
 | 5 | duplicates (src/dedup.py, duplicates_report.csv) | done | 9,081 sender+subject groups; 12,762 duplicate groups; 23,816 flagged (22,902 same-Date folder copies, 914 re-sends; 23,262 identical, 554 fuzzy); avg group 2.87, largest 51; 5,117 bodies under 50 chars; plain check 500 groups 0 mismatches | b70f74b |
-| 6 | notifications and MCP (src/notifier.py, mcp_server/gmail_server.py) | done | dry run: 23,816 .eml drafts + manifest in about 5s; live mode: 12,762 groups, ledger checked with a fake SMTP (sent/skip/failed/pending); stdio server refuses without credentials; --send-live never run | (next commit) |
-| 7 | main.py and tests | todo | | |
+| 6 | notifications and MCP (src/notifier.py, mcp_server/gmail_server.py) | done | dry run: 23,816 .eml drafts + manifest in about 5s; live mode: 12,762 groups, ledger checked with a fake SMTP (sent/skip/failed/pending); stdio server refuses without credentials; --send-live never run | c69c464 |
+| 7 | main.py and tests | done | python main.py from scratch in 32s: 40,651 loaded, 23,816 flagged, 23,816 drafts; second run inserts 0, report byte-identical; 43 pytest tests pass in 0.5s | (next commit) |
 | 8 | docs (README.md, AI_USAGE.md) | todo | | |
 | 9 | final check (fresh clone, deliverables, git history) | todo | | |
 
@@ -60,4 +60,9 @@ The plan is in BUILD_PROMPT.md (phases 0 to 9). Rules for every session are in C
 - Never ran --send-live against Gmail. All live-mode checks used a copy of enron.db, the in-process server (`Client(gmail_server.mcp)`) and a fake SMTP class (scratch scripts; phase 7 turns them into pytest tests).
 - output/replies/*.eml change on every run (Date = now), so they're committed once, after the final from-scratch run in phase 7, not here.
 - mcp_config.json.example and .env.example hold placeholders only. .env and mcp_config.json are gitignored, and neither exists yet.
+
+### Phase 7
+- `python main.py` = extract + load + dedup + drafts, about 32s from scratch. `--only <mailbox>` uses dev.db and output_dev/ (fischer-m takes 1.5s). `--fresh` only works with `--only`. `--send-live` can't be combined with `--only`.
+- Tests: tests/test_extractor.py (21), test_dedup.py (8), test_database.py (4), test_notifier.py (10). They cover every case in BUILD_PROMPT.md phase 7 plus dates, splitting, attachments, headings, the header repair, the template, the ledger and the server.
+- The final outputs committed here come from the from-scratch run: error_log.txt, duplicates_report.csv, output/*.txt, output/replies/, output/send_log.csv (header only, nothing sent).
 

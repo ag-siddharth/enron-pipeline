@@ -251,3 +251,23 @@ All numbers are from docs/EDA.md (41,264 files in the 5 picked mailboxes).
 ### D6.7 Draft format
 - **Decision:** each .eml is exactly the template: To, Subject, Date and References, a blank line, then the body with its blank lines and indentation. Lines end in LF. Date is the run time in RFC 2822 form (`Wed, 14 Oct 2026 07:46:20 +0000`). Date Sent shows the stored UTC ISO date, so it can be matched against duplicates_report.csv. The score drops trailing zeros (`100%`, `93.5%`). Control characters and line breaks in header text are replaced with spaces: 5 subjects contain `\x01`, and a line break would start a new header.
 - **Safe file names:** the Message-ID without `<>`, with anything other than letters, digits, `.`, `_` and `-` replaced by `_` (`22062940.1075845797850.JavaMail.evans_thyme.eml`). A repeat gets `_2`. output/replies/manifest.csv maps every file to its Message-ID. Old .eml files are removed before each dry run, so drafts for emails that are no longer flagged don't stay behind.
+
+## Phase 7: main.py and tests
+
+### D7.1 --fresh never touches enron.db, and --send-live never runs with --only
+- **Decision:** `--fresh` only deletes dev.db and must come with `--only`; to rebuild enron.db you delete it yourself. `--send-live` is refused together with `--only`. Bad combinations exit with code 2 and a message.
+- **Why:** enron.db also holds the notifications ledger, and deleting it by accident would forget which groups were already notified. One ledger (in enron.db) is the only way "skip groups already sent" can hold.
+- **Checked:** `main.py --fresh`, `main.py --only fischer-m --send-live` and `main.py --only nobody` all exit 2 with their message.
+
+### D7.2 Every stage's stats are printed and kept
+- **Decision:** main.py prints each stage's stats and writes them to output/extraction_stats.txt, load_stats.txt and dedup_stats.txt (output_dev/ with --only). Load conflicts and insert failures go to output/load_log.txt.
+- **Why:** the spec asks for extraction and duplicate statistics to be logged, and the README quotes these files.
+
+### D7.3 Tests can't send email
+- **Decision:** an autouse fixture in tests/conftest.py replaces smtplib.SMTP with a fake, sets fake Gmail settings, points both .env lookups at a missing file, and makes `notifier.stdio_server` raise, so live-mode tests have to use the in-process server.
+- **Why:** BUILD_PROMPT.md says never send a real email. Once you create .env, a test that started the real server as a subprocess would read it and could send for real.
+- **Checked:** 43 tests pass in under a second with no maildir. Breaking the code on purpose made the matching test fail each time: `distance>=limit` at the 90 boundary, a failed send recorded as sent, and attaching to the newest original instead of the earliest.
+
+### D7.4 Drafts are committed once, after the final run
+- **Decision:** output/replies/ (23,816 .eml files plus manifest.csv) is committed from the final from-scratch run only.
+- **Why:** every draft's Date is the run time, so each run rewrites all 23,816 files. Committing them every phase would add tens of thousands of changed files for nothing.

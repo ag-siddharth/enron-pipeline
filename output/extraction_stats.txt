@@ -1,0 +1,54 @@
+files found: 41264
+parsed: 40651
+failed: 613
+  no To header                 613
+fallback encodings: 11
+  maildir/sanders-r/all_documents/7328. (cp1252)
+  maildir/sanders-r/all_documents/7334. (cp1252)
+  maildir/sanders-r/all_documents/7342. (cp1252)
+  maildir/sanders-r/bastos/4. (cp1252)
+  maildir/sanders-r/deleted_items/bastos/4. (cp1252)
+  maildir/sanders-r/notes_inbox/312. (cp1252)
+  maildir/sanders-r/notes_inbox/313. (cp1252)
+  maildir/sanders-r/notes_inbox/315. (cp1252)
+  maildir/shankman-j/deleted_items/510. (cp1252)
+  maildir/shankman-j/personal/12. (cp1252)
+  maildir/shankman-j/saved_mail/1. (cp1252)
+decoded quoted-printable: 1165
+header block repaired: 1
+field coverage over parsed emails:
+  message_id          40651  100.0%
+  date                40651  100.0%
+  from_address        40651  100.0%
+  to_addresses        40651  100.0%
+  subject             39365   96.8%
+  body                40651  100.0%
+  source_file         40651  100.0%
+  cc_addresses        10737   26.4%
+  bcc_addresses       10737   26.4%
+  x_from              40651  100.0%
+  x_to                40651  100.0%
+  x_cc                10792   26.5%
+  x_bcc                   4    0.0%
+  x_folder            40651  100.0%
+  x_origin            40651  100.0%
+  content_type        40651  100.0%
+  has_attachment       6616   16.3%
+  forwarded_content   12674   31.2%
+  quoted_content      11439   28.1%
+  headings              762    1.9%
+body_basis:
+  authored            37154
+  forwarded            3420
+  quoted                 77
+first marker:
+  (no marker)                 16925
+  lotus_forwarded_by          11375
+  lotus_from_date              2929
+  lotus_name_date_block        3726
+  lotus_name_on_date           1943
+  other_forward                   7
+  outlook_header_block           28
+  outlook_original_message     3718
+earliest date: 1980-01-01T00:00:00+00:00
+latest date: 2002-07-12T11:36:00+00:00
