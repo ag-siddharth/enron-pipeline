@@ -19,8 +19,8 @@ The plan is in BUILD_PROMPT.md (phases 0 to 9). Rules for every session are in C
 | 5 | duplicates (src/dedup.py, duplicates_report.csv) | done | 9,081 sender+subject groups; 12,762 duplicate groups; 23,816 flagged (22,902 same-Date folder copies, 914 re-sends; 23,262 identical, 554 fuzzy); avg group 2.87, largest 51; 5,117 bodies under 50 chars; plain check 500 groups 0 mismatches | b70f74b |
 | 6 | notifications and MCP (src/notifier.py, mcp_server/gmail_server.py) | done | dry run: 23,816 .eml drafts + manifest in about 5s; live mode: 12,762 groups, ledger checked with a fake SMTP (sent/skip/failed/pending); stdio server refuses without credentials; --send-live never run | c69c464 |
 | 7 | main.py and tests | done | python main.py from scratch in 32s: 40,651 loaded, 23,816 flagged, 23,816 drafts; second run inserts 0, report byte-identical; 43 pytest tests pass in 0.5s | a9259b3 |
-| 8 | docs (README.md, AI_USAGE.md) | done | README: setup, MCP setup, run, every output, selection, EDA, decisions, limitations, final-run numbers; AI_USAGE: tools, 5 quoted prompts, 18 real fixes, MCP section; [TODO: me] left for % split, lessons, chat model, second LLM, screenshot | (next commit) |
-| 9 | final check (fresh clone, deliverables, git history) | todo | | |
+| 8 | docs (README.md, AI_USAGE.md) | done | README: setup, MCP setup, run, every output, selection, EDA, decisions, limitations, final-run numbers; AI_USAGE: tools, 5 quoted prompts, 18 real fixes, MCP section; [TODO: me] left for % split, lessons, chat model, second LLM, screenshot | b202f10 |
+| 9 | final check (fresh clone, deliverables, git history) | done | fresh clone + fresh venv from requirements.txt (pip freeze identical): main.py same numbers, 43 tests pass, outputs byte-identical apart from draft Dates; every section 7 deliverable tracked; .env, mcp_config.json, *.db, maildir never in history | (this commit, see git log) |
 
 ## Notes per phase
 
@@ -70,4 +70,10 @@ The plan is in BUILD_PROMPT.md (phases 0 to 9). Rules for every session are in C
 - README.md and AI_USAGE.md use the numbers from the phase 7 from-scratch run. AI_USAGE.md is built only from scratch_notes.md, this file, the git history and BUILD_PROMPT.md.
 - Left for the user ([TODO: me] in AI_USAGE.md): the % split, lessons learned, the Claude chat model, which second LLM reviewed the plan, the actual Claude Code prompt and reply for send_email, real MCP setup issues, and the live-send screenshot and log line.
 - The Write tool's hook timed out on README.md twice, so README.md and AI_USAGE.md were written with shell heredocs.
+
+### Phase 9
+- Clone in the scratchpad, fresh venv (Python 3.13.5) from requirements.txt, maildir symlinked: `main.py` gave 41,264 / 40,651 / 613 / 23,816 flagged / 23,816 drafts, and pytest passed 43.
+- Compared with the repo, these were byte-identical: duplicates_report.csv, error_log.txt, extraction/dedup stats, load_log.txt, manifest.csv, send_log.csv, and every .eml apart from its Date line. load_stats.txt differed (the repo's came from the phase 7 re-run), so the repo was re-run from scratch once and all outputs re-committed from that run.
+- `git log --all --name-only` has never listed .env, mcp_config.json, any .db file, maildir, ASSIGNMENT.md or .venv. The examples hold placeholders only.
+- All phases are done. What's left is for the user (see README.md "Gmail MCP server setup" and the [TODO: me] parts of AI_USAGE.md): App Password and .env, claude mcp add, one live send, screenshots, the TODOs, git push.
 

@@ -1,9 +1,9 @@
 records seen: 40651
-inserted: 0
-skipped, Message-ID already loaded: 40651
+inserted: 40651
+skipped, Message-ID already loaded: 0
   of those, content differs (conflict): 0
 insert errors: 0
-emails              40651 ->   40651
-addresses            7799 ->    7799
-email_recipients   179245 ->  179245
+emails                  0 ->   40651
+addresses               0 ->    7799
+email_recipients        0 ->  179245
 notifications           0 ->       0

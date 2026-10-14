@@ -101,6 +101,7 @@ These are real cases where AI-written code or a planned rule didn't work at firs
 16. **No structured result from the tool (phase 6).** A tool returning a bare `dict` gave the client only JSON text. Returning `dict[str, str]` made the SDK publish an output schema and fill structured_content, which the ledger uses for the outbound Message-ID.
 17. **Environment variables not reaching the server (phase 6).** The mcp stdio client passes only a short list of safe environment variables to the server process, so `GMAIL_*` set in the shell would never arrive. The server reads `.env` next to itself, and the notifier forwards the two variables explicitly.
 18. **Tests that passed too easily (phase 7).** All 43 tests passed on the first run, which proves little alone. The code was broken on purpose (off-by-one at the 90 boundary, a failed send recorded as sent, attaching to the newest original) and the right test failed each time.
+19. **A stats file from the wrong run (phase 9).** Cloning the repo into a temp folder, building a fresh venv from requirements.txt and re-running everything reproduced every output byte for byte, except output/load_stats.txt. The committed copy came from phase 7's re-run check ("inserted: 0"). The pipeline was re-run from scratch once, so every committed output comes from a single run.
 
 ## What I wrote vs. what AI wrote
 
