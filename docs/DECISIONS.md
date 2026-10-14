@@ -105,3 +105,47 @@ All numbers are from docs/EDA.md (41,264 files in the 5 picked mailboxes).
 - **Why:** BUILD_PROMPT.md asks for lowercased recipients. From is lowercased too so duplicate grouping can't split one sender in two. Not one of the 190,594 address entries in these mailboxes has an uppercase letter or lacks an @, so this changes nothing here but protects the grouping. The broken forms are how the export wrote Enron addresses (2,854 double-dot To entries), and they're still stable identifiers.
 - **Considered:** "fixing" `b..sanders` to `b.sanders`, which would invent addresses.
 - **Checked:** EDA address table.
+
+## Phase 3: extraction
+
+### D3.1 The extractor reads the time zone itself
+- **Decision:** `parse_date` takes the date and time fields from `email.utils.parsedate_tz` but reads the zone token after the time itself. A numeric `+HHMM`/`-HHMM` wins (`-0700 (PDT)` uses -0700). Otherwise the abbreviation must be one of UT, UTC, GMT, Z, EST, EDT, CST, CDT, MST, MDT, PST, PDT, AST, ADT, AKST, AKDT, HST. Anything else fails as `unparseable Date: unknown time zone X`, and a date with no zone fails as `unparseable Date: no time zone`. The result is UTC ISO 8601 (`2001-05-14T23:39:00+00:00`), and the raw header is kept in raw_date.
+- **Why:** in Python 3.13, `parsedate_tz('... 16:39:00 XYZ')` and `parsedate_tz('... 16:39:00')` both return offset 0, so an unknown zone silently becomes UTC. BUILD_PROMPT.md says an unknown time zone is a failure.
+- **Considered:** the private `email._parseaddr._timezones` table (private API, and it lacks AKST/HST); `parsedate_to_datetime` (same 0-offset behaviour).
+- **Checked:** `XYZ` fails, `PST` gives 00:39 UTC the next day, `-0700 (PDT)` gives 23:39 UTC (broken-file test and a PST test file). All 41,264 real dates parse.
+
+### D3.2 Every failing mandatory check is logged
+- **Decision:** a failed file gets one `path<TAB>reasons` line in error_log.txt, listing every failing check joined by `; ` (for example `no Message-ID; unparseable Date: no Date header; ...`). The stats count each reason, so a file can count under several. An exception while reading or parsing becomes `could not parse: <type>: <message>`, and the run moves on.
+- **Why:** an empty file fails six checks at once, and naming only the first hides the rest. The reason names are the ones listed in BUILD_PROMPT.md phase 3.
+- **Considered:** one reason per file. Shorter, but less useful when debugging.
+- **Checked:** broken-file test (empty file, random bytes, no headers, no blank line, unknown zone, `To: undisclosed-recipients:;`, an unreadable file): all logged, the good file next to them parsed, hidden files skipped. The real run logs 613 files, all `no To header`.
+
+### D3.3 raw_text is the decoded text after the headers
+- **Decision:** raw_text holds everything after the header block with quoted-printable or base64 undone (for multipart emails, the text/plain parts joined). body, quoted_content and forwarded_content are cut from it, so nothing is lost.
+- **Why:** BUILD_PROMPT.md says "keep the full decoded text in raw_text" under the body rules. The headers are already stored field by field, and the fingerprint covers the raw file.
+- **Considered:** the whole file including headers, which duplicates every header column.
+- **Checked:** body is non-empty for all 40,651 parsed emails.
+
+### D3.4 The body falls back to forwarded content first, then quoted content
+- **Decision:** with no authored text, body takes forwarded_content if there is any, otherwise quoted_content, and body_basis records `forwarded` or `quoted`.
+- **Why:** pure forwards are the common case (3,420 emails with basis `forwarded` against 77 `quoted`), and a forward's content is what the sender meant to deliver.
+- **Checked:** extractor stats (body_basis table) and samples of each basis.
+
+### D3.5 Headings come from the whole decoded text
+- **Decision:** `find_headings` runs `markers.heading_kind` over every line of raw_text, so headings in forwarded content count too. `>` lines are never headings. Repeats within one email are dropped, and the rest are stored one per line in reading order.
+- **Why:** the spec says "all the headings present in the email content". A forwarded newsletter's section titles are part of what the email delivers.
+- **Checked:** 762 parsed emails (1.9%) have headings; samples are real (`E-MAIL NOTICE`, `FERC DOCUMENTS`, `3.  Litigation and Other Contingencies`).
+
+### D3.6 Link placeholders aren't attachments
+- **Decision:** a `<<...>>` placeholder containing `mailto:`, `http:`/`https:` or `www.` doesn't count as attachment evidence. Placeholders with `@` inside a file name (`<<2RD@01!.DOC>>`) and OLE objects (`<< OLE Object: Picture >>`) still count.
+- **Why:** Outlook writes links the same way as files (`<< File: mailto:cwoods@mayerbrown.com >>`). Of 7,015 placeholders, 6,627 end in a file extension, 300 are OLE objects or documents without an extension, and 41 are links.
+- **Checked:** has_attachment went from 6,619 to 6,616 emails; the EDA attachment tables use the same `markers.file_placeholders`.
+
+### D3.7 Field details
+- **subject:** unfolded and with encoded words decoded, otherwise exactly as written (not stripped, Re:/Fwd: kept). An empty subject is allowed: 1,286 parsed emails have one.
+- **from_address:** the first valid address of the From header, lowercased (D2.11).
+- **to/cc/bcc:** `getaddresses` after unfolding, lowercased, entries without `local@domain` dropped, repeats dropped (D2.10). Bcc is stored even though it equals Cc everywhere (D1.3), because the spec says it must be captured.
+- **content_type:** the full header value (`text/plain; charset=us-ascii`), unfolded.
+- **x_ fields:** unfolded, decoded and stripped; empty ones become None (X-bcc is filled in only 4 parsed emails).
+- **multipart:** text/plain parts become the text; parts with a filename or an `attachment` disposition become evidence, so multipart alone never sets has_attachment. No email here is multipart, so this is covered by a test in phase 7.
+- **fingerprint:** computed on the raw body before quoted-printable decoding, so it is the same value the selection and the EDA counted.

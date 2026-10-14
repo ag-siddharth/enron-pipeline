@@ -20,12 +20,23 @@ SENT_LINE=re.compile(r'^\s*(Sent|Date):\s', re.I)
 FW_SUBJECT=re.compile(r'^\s*(fw|fwd)\s*:', re.I)
 
 PLACEHOLDER=re.compile(r'<<[^<>\n]+>>')
+# 41 of 7,015 placeholders are links (<< File: mailto:x@y.com >>, <<http://...>>), not files
+LINK_PLACEHOLDER=re.compile(r'mailto:|https?:|www\.', re.I)
 # attach, attached, attaches, attaching, attachment, attachments (EDA: all six are common enough)
 ATTACH_WORD=re.compile(r'\battach(?:ed|es|ing|ment|ments)?\b', re.I)
 
 HEADER_LIKE=re.compile(r'^\s*(from|to|sent|cc|bcc|subject|date)\s*:', re.I)
 UNDERLINE=re.compile(r'^\s*(-{3,}|={3,})\s*$')
 NUMBERED=re.compile(r'^\s*\d{1,2}(\.\d{1,2})*[.)]\s+')
+
+
+def file_placeholders(text):
+    """Every <<file>> placeholder in the text that names a file rather than a link."""
+    found=[]
+    for match in PLACEHOLDER.finditer(text):
+        if LINK_PLACEHOLDER.search(match.group(0)) is None:
+            found.append(match.group(0))
+    return found
 
 
 def is_quote_line(line):

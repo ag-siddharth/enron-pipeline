@@ -10,6 +10,8 @@ from email.parser import HeaderParser
 
 # a header line starts with a field name (printable ascii, no spaces or colon) and a colon
 HEADER_LINE=re.compile(r'^[!-9;-~]+:')
+# re: 16,740, fw: 2,005 and fwd: 242 are the only reply/forward prefixes in the picked mailboxes
+SUBJECT_PREFIX=re.compile(r'^\s*(re|fw|fwd)\s*:', re.I)
 
 
 def list_email_files(folder):
@@ -144,6 +146,17 @@ def collapse_ws(text):
     return ' '.join(text.split())
 
 
+def normalize_subject(subject):
+    """Strip leading Re:/Fw:/Fwd: over and over (any case or spacing), collapse whitespace, lowercase."""
+    text=subject
+    while True:
+        stripped=SUBJECT_PREFIX.sub('', text, count=1)
+        if stripped==text:
+            break
+        text=stripped
+    return collapse_ws(text).lower()
+
+
 def fingerprint(headers, body):
     """md5 of the raw From, To, Cc, Date and Subject plus the body with whitespace collapsed."""
     # every file has its own Message-ID, so copies of one email can only be matched by content
@@ -164,8 +177,8 @@ def read_email(path):
         raw=f.read()
     text, encoding=decode_bytes(raw)
     text=to_lf(text)
-    header_text, body=split_message(text)
-    header_text, body=repair_headers(header_text, body)
+    plain_header, plain_body=split_message(text)
+    header_text, body=repair_headers(plain_header, plain_body)
     headers=parse_headers(header_text)
     item={}
     item['raw']=raw
@@ -174,5 +187,6 @@ def read_email(path):
     item['header_text']=header_text
     item['headers']=headers
     item['body']=body
+    item['repaired']=header_text!=plain_header
     item['fingerprint']=fingerprint(headers, body)
     return item

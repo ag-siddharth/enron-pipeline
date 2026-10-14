@@ -199,8 +199,7 @@ def survey_headers(c, path, item):
     c['ctype'][get(headers, 'Content-Type') or '(missing)']+=1
     if len(headers.defects)>0:
         c['misc']['header block with a parse defect (after repair)']+=1
-    plain_header, plain_body=common.split_message(item['text'])
-    if (plain_header, plain_body)!=(item['header_text'], item['body']):
+    if item['repaired']:
         c['misc']['header block changed by repair_headers']+=1
     if common.header_value(headers, 'X-To') is not None:
         c['misc']['files with an X-To header']+=1
@@ -368,14 +367,14 @@ def survey_body(c, item):
     # attachment cues and where they sit
     for m in ATTACH_WORD.finditer(body):
         c['attach_words'][m.group(0).lower()]+=1
-    if markers.PLACEHOLDER.search(body):
+    if len(markers.file_placeholders(body))>0:
         c['attach_where']['`<<file>>` placeholder anywhere']+=1
     places=[]
-    if markers.PLACEHOLDER.search(authored):
+    if len(markers.file_placeholders(authored))>0:
         places.append('authored')
-    if kind=='forward' and markers.PLACEHOLDER.search(block):
+    if kind=='forward' and len(markers.file_placeholders(block))>0:
         places.append('forwarded')
-    if (kind=='reply' and markers.PLACEHOLDER.search(block)) or markers.PLACEHOLDER.search(quoted):
+    if (kind=='reply' and len(markers.file_placeholders(block))>0) or len(markers.file_placeholders(quoted))>0:
         places.append('quoted')
     for place in places:
         c['attach_where']['placeholder in '+place+' text']+=1

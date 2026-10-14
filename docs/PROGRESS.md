@@ -13,8 +13,8 @@ The plan is in BUILD_PROMPT.md (phases 0 to 9). Rules for every session are in C
 |---|---|---|---|---|
 | 0 | setup: BUILD_PROMPT.md, .gitignore, CLAUDE.md, requirements.txt, docs | done | Python 3.13.5; tqdm 4.70.1, rapidfuzz 3.14.6, mcp 2.3.0, pytest 9.1.1 import fine | 9da6aac |
 | 1 | mailbox selection (scripts/select_mailboxes.py, src/common.py) | done | 150 mailboxes, 517,401 files, 0 read errors; picked sanders-r, mann-k, sager-e, shankman-j, fischer-m = 41,264 files, 17,903 distinct (matches the earlier run) | e984d4f |
-| 2 | EDA (scripts/eda.py, src/markers.py, docs/EDA.md) | done | 93.2% mixed CRLF/LF; 11 cp1252; 1,165 quoted-printable; 0 bad dates, 84 bogus 1980 placeholders; 613 files without To; 13,025 copy groups; 1,281 Outlook forwards; 7 rule changes (D2.1-D2.11) | (next commit) |
-| 3 | extraction (src/extractor.py) | todo | | |
+| 2 | EDA (scripts/eda.py, src/markers.py, docs/EDA.md) | done | 93.2% mixed CRLF/LF; 11 cp1252; 1,165 quoted-printable; 0 bad dates, 84 bogus 1980 placeholders; 613 files without To; 13,025 copy groups; 1,281 Outlook forwards; 7 rule changes (D2.1-D2.11) | 7bbc2fd |
+| 3 | extraction (src/extractor.py) | done | 41,264 files: 40,651 parsed, 613 failed (all no To header); 11 cp1252, 1,165 quoted-printable, 1 header repair; body_basis 37,154 authored / 3,420 forwarded / 77 quoted; has_attachment 16.3%, headings 1.9%; dates 1980-01-01 (bogus) to 2002-07-12 | (next commit) |
 | 4 | database (schema.sql, src/database.py, sample_queries.sql) | todo | | |
 | 5 | duplicates (src/dedup.py, duplicates_report.csv) | todo | | |
 | 6 | notifications and MCP (src/notifier.py, mcp_server/gmail_server.py) | todo | | |
@@ -39,4 +39,10 @@ The plan is in BUILD_PROMPT.md (phases 0 to 9). Rules for every session are in C
 - `scripts/eda.py` takes about 25s and regenerates docs/EDA.md. The marker, heading and attachment rules live in `src/markers.py`, which the EDA and the extractor share.
 - Rule changes from the data (details in docs/DECISIONS.md D2.1 to D2.11): CRLF to LF with mixed endings, a header repair for stray lines, decoding quoted-printable before splitting, Outlook blocks under FW: subjects counted as forwards, three Lotus reply shapes, `>` at column 0 only, placeholders counted in authored and forwarded text, precision filters for headings, 1980 dates kept, repeated recipients dropped, lowercase addresses.
 - Hypotheses checked: To is missing in 1.5% of files here (not 3%); Content-Type is always text/plain, but CTE is quoted-printable in 1,165 files; Bcc equals Cc in all 10,832 picked files; every date is `-0700 (PDT)` or `-0800 (PST)`.
+
+### Phase 3
+- Run on its own with `.venv/bin/python -m src.extractor` (about 16s). It's a generator, so the loader can stream records instead of holding 40k emails in memory.
+- Coverage over parsed emails: message_id, date, from, to, body, x_from, x_to, x_folder, x_origin and content_type 100%; subject 96.8% non-empty; cc/bcc 26.4%; forwarded_content 31.2%; quoted_content 28.1%.
+- Broken-file test (in the scratchpad, not the repo): empty file, random bytes, no headers, no blank line (with and without text), unknown zone, undisclosed To, unreadable file, hidden file and folder, missing mailbox. All logged with specific reasons; the good file and the glued-body file parsed.
+- Decisions D3.1 to D3.7: the zone is read by our code (Python 3.13 parsedate_tz returns 0 for unknown zones), all failing reasons are logged, raw_text is the decoded text after the headers, the body falls back to forwarded first, headings come from the whole text, link placeholders aren't attachments.
 

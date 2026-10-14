@@ -347,12 +347,12 @@ Reply-style first markers by subject prefix (Outlook uses the same Original Mess
 
 | Cue | Files |
 |---|---|
-| `<<file>>` placeholder anywhere | 4,264 |
-| placeholder in authored text | 970 |
-| placeholder in forwarded text | 1,923 |
-| placeholder in quoted text | 1,382 |
-| placeholder only in forwarded text | 1,920 |
-| placeholder only in quoted text | 1,374 |
+| `<<file>>` placeholder anywhere | 4,254 |
+| placeholder in authored text | 967 |
+| placeholder in forwarded text | 1,922 |
+| placeholder in quoted text | 1,376 |
+| placeholder only in forwarded text | 1,919 |
+| placeholder only in quoted text | 1,368 |
 | attach word in authored text | 4,582 |
 | attach word only outside the authored text | 7,214 |
 
@@ -422,7 +422,7 @@ Candidates are lines of 60 characters or less that are not From:/To:/Sent:/cc:/S
 | Lotus reply blocks start "From: Name   date" | only 2,929 files start that way; 3,744 use name / date / To: lines and 1,943 `Name <addr> on date` | extended: all three shapes count |
 | > quoting is line by line | 1,514 files have > lines at column 0, 80 more only after spaces | keep column 0 only (indented > is mostly ASCII art and nested jokes) |
 | has_attachment words in the sender's own text | 7,214 files have the words only outside the authored text | keep; also count attaches/attaching/attachments |
-| `<<file>>` placeholders | 1,920 files have them only in forwarded text, 1,374 only in quoted replies | refined: count authored and forwarded text, not quoted replies |
+| `<<file>>` placeholders | 1,919 files have them only in forwarded text, 1,368 only in quoted replies | refined: count authored and forwarded text, not quoted replies |
 | Headings: ALL CAPS, underlined, numbered | 4,530 / 1,105 / 691 raw candidates, 1,286 / 267 / 5 kept | refined: precision filters above |
 
 Details and reasons for every change are in docs/DECISIONS.md.

@@ -15,3 +15,5 @@
 - Phase 2: the prompt said Outlook Original Message is a reply marker, but 1,281 of 3,740 of those emails are FW: forwards (Outlook uses the same line for both). Changed the rule: FW: subject means forwarded_content.
 - Phase 2: the first heading rule was mostly noise (FYI, initials like JWVS, [IMAGE], <<FILE.DOC>>). Added precision filters and checked the kept list by eye.
 - Phase 2: <<file>> and Name <addr> vanished from the markdown tables because GitHub reads them as HTML tags. Wrapped them in backticks.
+- Phase 3: Python 3.13's email.utils.parsedate_tz returns offset 0 for an unknown zone and for a date with no zone at all, so "XYZ" quietly became UTC. Read the zone token in our own code and fail unknown zones, as the prompt asks.
+- Phase 3: "<< File: mailto:cwoods@mayerbrown.com >>" made has_attachment true. That's an Outlook link, not a file. Placeholders with mailto/http/www are now skipped (41 of 7,015).
