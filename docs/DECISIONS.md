@@ -149,3 +149,35 @@ All numbers are from docs/EDA.md (41,264 files in the 5 picked mailboxes).
 - **x_ fields:** unfolded, decoded and stripped; empty ones become None (X-bcc is filled in only 4 parsed emails).
 - **multipart:** text/plain parts become the text; parts with a filename or an `attachment` disposition become evidence, so multipart alone never sets has_attachment. No email here is multipart, so this is covered by a test in phase 7.
 - **fingerprint:** computed on the raw body before quoted-printable decoding, so it is the same value the selection and the EDA counted.
+
+## Phase 4: database
+
+### D4.1 Every file with its own Message-ID is its own row
+- **Decision:** the loader inserts every parsed file whose Message-ID isn't in the database yet, even when its content matches another file. A repeated Message-ID is skipped; if its fingerprint differs from the stored row it's logged as a conflict in output/load_log.txt.
+- **Why:** the spec (task 2) makes the unique constraint on message_id the duplicate check at insert, and task 3 defines content duplicates by sender, subject and 90% body similarity. Folder copies have different Message-IDs (41,264 IDs for 41,264 files), so they're rows that task 3 then flags. That keeps every source_file traceable and lets the report show folder copies next to real re-sends.
+- **Considered:** merging copies at ingestion by fingerprint, which was the earlier plan in scratch_notes.md. That would hide about 23,000 flags from duplicates_report.csv and drop the source_file of every copy.
+- **Checked:** two loads in a row. Run 1 inserted 40,651 emails, 7,799 addresses and 179,245 recipient rows; run 2 inserted 0 and skipped 40,651 with 0 conflicts, and every table count was unchanged. `PRAGMA foreign_key_check` and `integrity_check` are clean. A made-up repeat with a different fingerprint was logged as a conflict.
+
+### D4.2 Recipients live in two tables
+- **Decision:** `addresses` holds each address once; `email_recipients` has one row per (email, type, address) with type `to`, `cc` or `bcc` and the position in the header. Repeated addresses in one header were already dropped by the extractor (D2.10), so the primary key (email_id, type, address_id) never collides.
+- **Why:** the spec forbids comma-separated recipient strings. The position keeps the to/cc/bcc lists in their original order.
+- **Considered:** a recipients table without addresses (repeats every address string 179,245 times instead of 7,799).
+- **Checked:** sample queries 3a to 3c join through both tables.
+
+### D4.3 Types: ISO text dates with a CHECK, 0/1 booleans
+- **Decision:** date is TEXT that must match `____-__-__T__:__:__+00:00`, and every boolean is 0 or 1 under a CHECK. The NOT NULL columns are the mandatory fields plus the pipeline's own (raw_date, body_basis, raw_text, normalized_subject, fingerprint).
+- **Why:** BUILD_PROMPT.md asks for ISO 8601 UTC text so dates sort in time order. SQLite has no DATETIME or BOOLEAN type, so the CHECKs stop bad values going in quietly.
+- **Checked:** a record with `date='not a date'` failed the CHECK, was logged, and rolled back alone.
+
+### D4.4 One transaction per load, one savepoint per email
+- **Decision:** a load is one explicit `BEGIN ... COMMIT`, and each email is inserted inside its own SAVEPOINT. A failing insert rolls back only that email (and its recipients), is logged in output/load_log.txt, and the run goes on. The address-id cache is cleared after a rollback.
+- **Why:** the pipeline must never crash on bad input, and one transaction keeps the load fast (about 23s for 40,651 emails). Without the explicit BEGIN, Python's sqlite3 lets the first SAVEPOINT start the transaction, and then every RELEASE commits, which means 40,000 separate commits.
+- **Checked:** the conflict and rollback test (one good, one repeat with different content, one bad date, one good) gives 2 inserted, 1 conflict, 1 insert error, with the addresses table consistent.
+
+### D4.5 The notifications ledger is its own table
+- **Decision:** `notifications` has one row per send attempt: group_key (the group's original message_id), duplicate_message_id, intended and actual recipient, subject, status (`pending`, `sent` or `failed`, under a CHECK), error, outbound_message_id, created_at, updated_at. Dedup never touches it.
+- **Why:** BUILD_PROMPT.md phase 4 asks for it, and keeping it apart means re-running dedup can't make the pipeline forget what it already sent.
+
+### D4.6 Indexes and sample query outputs
+- **Decision:** indexes on date, from_address and subject (the spec), (from_address, normalized_subject) for task 3's grouping, fingerprint (not unique), duplicate_of, email_recipients.address_id and notifications.group_key. The outputs in sample_queries.sql are written by `scripts/run_sample_queries.py`, which runs each query against enron.db and replaces the comment under it.
+- **Why:** the "real output" can't drift from the database if a script writes it. EXPLAIN QUERY PLAN (query 2c) shows the date range query using idx_emails_date.

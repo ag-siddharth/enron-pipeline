@@ -17,3 +17,5 @@
 - Phase 2: <<file>> and Name <addr> vanished from the markdown tables because GitHub reads them as HTML tags. Wrapped them in backticks.
 - Phase 3: Python 3.13's email.utils.parsedate_tz returns offset 0 for an unknown zone and for a date with no zone at all, so "XYZ" quietly became UTC. Read the zone token in our own code and fail unknown zones, as the prompt asks.
 - Phase 3: "<< File: mailto:cwoods@mayerbrown.com >>" made has_attachment true. That's an Outlook link, not a file. Placeholders with mailto/http/www are now skipped (41 of 7,015).
+- Phase 4: caught before the first run. In Python's sqlite3, a SAVEPOINT outside a transaction starts one, so every RELEASE would have committed and the load would have been 40k separate commits. Added an explicit BEGIN. Also clear the address cache after a rolled-back email, so a rolled-back address id isn't reused.
+- Phase 4: one person, two sender addresses. Richard Sanders sends as richard.sanders@enron.com (3,119 rows) and b..sanders@enron.com (337). Dedup groups by from_address, so it can't link the two. Noted as a limitation, not fixed (that would be inventing identity rules).

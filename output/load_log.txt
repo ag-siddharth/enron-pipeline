@@ -1,0 +1,1 @@
+# conflicts and insert failures from the last load (message_id, source_file, detail)

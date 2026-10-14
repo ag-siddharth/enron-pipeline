@@ -14,8 +14,8 @@ The plan is in BUILD_PROMPT.md (phases 0 to 9). Rules for every session are in C
 | 0 | setup: BUILD_PROMPT.md, .gitignore, CLAUDE.md, requirements.txt, docs | done | Python 3.13.5; tqdm 4.70.1, rapidfuzz 3.14.6, mcp 2.3.0, pytest 9.1.1 import fine | 9da6aac |
 | 1 | mailbox selection (scripts/select_mailboxes.py, src/common.py) | done | 150 mailboxes, 517,401 files, 0 read errors; picked sanders-r, mann-k, sager-e, shankman-j, fischer-m = 41,264 files, 17,903 distinct (matches the earlier run) | e984d4f |
 | 2 | EDA (scripts/eda.py, src/markers.py, docs/EDA.md) | done | 93.2% mixed CRLF/LF; 11 cp1252; 1,165 quoted-printable; 0 bad dates, 84 bogus 1980 placeholders; 613 files without To; 13,025 copy groups; 1,281 Outlook forwards; 7 rule changes (D2.1-D2.11) | 7bbc2fd |
-| 3 | extraction (src/extractor.py) | done | 41,264 files: 40,651 parsed, 613 failed (all no To header); 11 cp1252, 1,165 quoted-printable, 1 header repair; body_basis 37,154 authored / 3,420 forwarded / 77 quoted; has_attachment 16.3%, headings 1.9%; dates 1980-01-01 (bogus) to 2002-07-12 | (next commit) |
-| 4 | database (schema.sql, src/database.py, sample_queries.sql) | todo | | |
+| 3 | extraction (src/extractor.py) | done | 41,264 files: 40,651 parsed, 613 failed (all no To header); 11 cp1252, 1,165 quoted-printable, 1 header repair; body_basis 37,154 authored / 3,420 forwarded / 77 quoted; has_attachment 16.3%, headings 1.9%; dates 1980-01-01 (bogus) to 2002-07-12 | 770aaad |
+| 4 | database (schema.sql, src/database.py, sample_queries.sql) | done | load 1: 40,651 emails, 7,799 addresses, 179,245 recipient rows; load 2: 0 added, 40,651 skipped, 0 conflicts; FK and integrity checks clean | (next commit) |
 | 5 | duplicates (src/dedup.py, duplicates_report.csv) | todo | | |
 | 6 | notifications and MCP (src/notifier.py, mcp_server/gmail_server.py) | todo | | |
 | 7 | main.py and tests | todo | | |
@@ -45,4 +45,9 @@ The plan is in BUILD_PROMPT.md (phases 0 to 9). Rules for every session are in C
 - Coverage over parsed emails: message_id, date, from, to, body, x_from, x_to, x_folder, x_origin and content_type 100%; subject 96.8% non-empty; cc/bcc 26.4%; forwarded_content 31.2%; quoted_content 28.1%.
 - Broken-file test (in the scratchpad, not the repo): empty file, random bytes, no headers, no blank line (with and without text), unknown zone, undisclosed To, unreadable file, hidden file and folder, missing mailbox. All logged with specific reasons; the good file and the glued-body file parsed.
 - Decisions D3.1 to D3.7: the zone is read by our code (Python 3.13 parsedate_tz returns 0 for unknown zones), all failing reasons are logged, raw_text is the decoded text after the headers, the body falls back to forwarded first, headings come from the whole text, link placeholders aren't attachments.
+
+### Phase 4
+- enron.db (gitignored) is in the repo root, 191 MB. The load takes about 23s.
+- `scripts/run_sample_queries.py` refreshes the outputs in sample_queries.sql. Queries 4a/4b (duplicates) show 0 rows until phase 5 has run, so refresh them after dedup.
+- Two loads in a row: run 1 inserted 40,651; run 2 inserted 0 and skipped 40,651 with no conflicts; all table counts unchanged.
 
