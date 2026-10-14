@@ -7,3 +7,11 @@
 - Claude Code's review found every file has its own Message-ID, so "unique" counted files. Over half were copies of the same email in different folders. Switched to a content fingerprint, re-picked 5 mailboxes (17,903 distinct), decided to merge copies at ingestion.
 - Claude Code used a different Python than my terminal and stubbed out tqdm. Fixed with .venv and a CLAUDE.md rule to always use .venv/bin/python.
 - Shell commands with # comments broke in zsh (comments aren't skipped by default) and created junk folders.
+
+## Build with Claude Code (BUILD_PROMPT.md, one long session)
+- Phase 1 re-ran my selection rules from scratch and got the same 5 mailboxes (41,264 files, 17,903 distinct), so the earlier pick holds.
+- Phase 2: sager-e/calendar/34 has a bare line break inside its Subject. The email module took the next line as the start of the body and silently dropped the other 12 headers. Fixed with repair_headers in src/common.py, which folds a stray line back into the header above when more headers follow. Re-ran the selection to check the picks didn't move.
+- Phase 2: quoted-printable files end marker lines with =20 ("-----Original Message-----=20"), so 37 Outlook markers were invisible until the body was decoded. Decode first, then split.
+- Phase 2: the prompt said Outlook Original Message is a reply marker, but 1,281 of 3,740 of those emails are FW: forwards (Outlook uses the same line for both). Changed the rule: FW: subject means forwarded_content.
+- Phase 2: the first heading rule was mostly noise (FYI, initials like JWVS, [IMAGE], <<FILE.DOC>>). Added precision filters and checked the kept list by eye.
+- Phase 2: <<file>> and Name <addr> vanished from the markdown tables because GitHub reads them as HTML tags. Wrapped them in backticks.

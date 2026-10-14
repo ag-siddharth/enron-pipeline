@@ -1,9 +1,15 @@
 # shared helpers: find email files, decode them, split headers from body, fingerprint them
 # the selection script, the EDA script and the extractor all use these so their counts match
 
+import base64
 import hashlib
 import os
+import quopri
+import re
 from email.parser import HeaderParser
+
+# a header line starts with a field name (printable ascii, no spaces or colon) and a colon
+HEADER_LINE=re.compile(r'^[!-9;-~]+:')
 
 
 def list_email_files(folder):
@@ -50,6 +56,55 @@ def split_message(text):
     return text[:pos+1], text[pos+2:]
 
 
+def is_stray_line(lines, i):
+    """True if line i of a header block is neither a header nor a folded continuation."""
+    line=lines[i]
+    if line=='':
+        return False
+    if i>0 and (line[0]==' ' or line[0]=='\t'):
+        return False
+    return HEADER_LINE.match(line) is None
+
+
+def more_headers_below(lines, i):
+    """True if any line after line i looks like a header."""
+    for later in lines[i+1:]:
+        if HEADER_LINE.match(later):
+            return True
+    return False
+
+
+def repair_headers(header_text, body):
+    """Fix stray lines in the header block so the email module doesn't stop early."""
+    # sager-e/calendar/34 has a bare line break inside its Subject, and the email module
+    # then drops every header after it. a stray line with more headers below it is a broken
+    # value, so fold it in. with no headers below it (or on the very first line) the blank
+    # line is missing and the body starts there
+    if header_text=='':
+        return header_text, body
+    lines=header_text.split('\n')
+    if header_text.endswith('\n'):
+        lines=lines[:-1]
+    fixed=[]
+    for i in range(len(lines)):
+        if not is_stray_line(lines, i):
+            fixed.append(lines[i])
+            continue
+        if i>0 and more_headers_below(lines, i):
+            fixed.append(' '+lines[i])
+            continue
+        rest='\n'.join(lines[i:])
+        if body=='':
+            body=rest
+        else:
+            body=rest+'\n\n'+body
+        break
+    new_header_text=''
+    if len(fixed)>0:
+        new_header_text='\n'.join(fixed)+'\n'
+    return new_header_text, body
+
+
 def parse_headers(header_text):
     """Parse only the header block with the email module."""
     return HeaderParser().parsestr(header_text)
@@ -61,6 +116,27 @@ def header_value(headers, name):
     if value is None:
         return None
     return str(value)
+
+
+def unfold(value):
+    """Join a folded header value back into one line."""
+    # the continuation lines keep their leading space or tab, so dropping the line break is enough
+    return value.replace('\n', '')
+
+
+def decode_body(body, transfer_encoding, file_encoding):
+    """Undo quoted-printable or base64 on a body, returns (text, charset used or None)."""
+    name=(transfer_encoding or '').strip().lower()
+    if name!='quoted-printable' and name!='base64':
+        return body, None
+    # strict decoding means encoding with the same codec gives back the exact file bytes
+    raw=body.encode(file_encoding)
+    if name=='quoted-printable':
+        decoded=quopri.decodestring(raw)
+    else:
+        decoded=base64.b64decode(raw)
+    text, charset=decode_bytes(decoded)
+    return to_lf(text), charset
 
 
 def collapse_ws(text):
@@ -89,6 +165,7 @@ def read_email(path):
     text, encoding=decode_bytes(raw)
     text=to_lf(text)
     header_text, body=split_message(text)
+    header_text, body=repair_headers(header_text, body)
     headers=parse_headers(header_text)
     item={}
     item['raw']=raw
