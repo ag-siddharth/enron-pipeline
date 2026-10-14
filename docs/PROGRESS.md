@@ -20,7 +20,7 @@ The plan is in BUILD_PROMPT.md (phases 0 to 9). Rules for every session are in C
 | 6 | notifications and MCP (src/notifier.py, mcp_server/gmail_server.py) | done | dry run: 23,816 .eml drafts + manifest in about 5s; live mode: 12,762 groups, ledger checked with a fake SMTP (sent/skip/failed/pending); stdio server refuses without credentials; --send-live never run | c69c464 |
 | 7 | main.py and tests | done | python main.py from scratch in 32s: 40,651 loaded, 23,816 flagged, 23,816 drafts; second run inserts 0, report byte-identical; 43 pytest tests pass in 0.5s | a9259b3 |
 | 8 | docs (README.md, AI_USAGE.md) | done | README: setup, MCP setup, run, every output, selection, EDA, decisions, limitations, final-run numbers; AI_USAGE: tools, 5 quoted prompts, 18 real fixes, MCP section; [TODO: me] left for % split, lessons, chat model, second LLM, screenshot | b202f10 |
-| 9 | final check (fresh clone, deliverables, git history) | done | fresh clone + fresh venv from requirements.txt (pip freeze identical): main.py same numbers, 43 tests pass, outputs byte-identical apart from draft Dates; every section 7 deliverable tracked; .env, mcp_config.json, *.db, maildir never in history | (this commit, see git log) |
+| 9 | final check (fresh clone, deliverables, git history) | done | fresh clone + fresh venv from requirements.txt (pip freeze identical): main.py same numbers, 43 tests pass, outputs byte-identical apart from draft Dates; every section 7 deliverable tracked; .env, mcp_config.json, *.db, maildir never in history | 381d9a3 |
 
 ## Notes per phase
 
