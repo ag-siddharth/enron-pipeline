@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "gmail": {
+      "type": "stdio",
+      "command": "/absolute/path/to/enron-pipeline/.venv/bin/python",
+      "args": ["/absolute/path/to/enron-pipeline/mcp_server/gmail_server.py"],
+      "env": {
+        "GMAIL_ADDRESS": "your.name@gmail.com",
+        "GMAIL_APP_PASSWORD": "xxxx xxxx xxxx xxxx"
+      }
+    }
+  }
+}

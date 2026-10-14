@@ -216,3 +216,38 @@ All numbers are from docs/EDA.md (41,264 files in the 5 picked mailboxes).
 ### D5.5 Bogus 1980 dates barely matter
 - **Decision:** no special case.
 - **Why:** of the 74 parsed emails dated 1980-01-01, 17 are flagged against 1980 originals (folder copies of each other) and only 1 flag pairs a 1980 original with a later duplicate.
+
+## Phase 6: notifications and MCP
+
+### D6.1 A small custom MCP server on the official SDK, sending through Gmail SMTP
+- **Decision:** `mcp_server/gmail_server.py` is our own server built with the official MCP Python SDK (mcp 2.3.0, `MCPServer`). It has one tool, `send_email`, which sends through smtp.gmail.com:587 with STARTTLS and a Google App Password.
+- **Why:** the spec allows "an existing open-source server or build a custom one" that supports send_email, and BUILD_PROMPT.md limits third-party packages to tqdm, rapidfuzz, mcp and pytest. SMTP with an App Password needs only the standard library, and a server we wrote can set Date, References, Message-ID and X-Intended-Recipient exactly as the template needs.
+- **Considered:** an npm Gmail MCP server with OAuth (brings Node and a Google Cloud project), and the Gmail API with OAuth from Python (needs google-api-python-client, which isn't allowed). The README explains how to switch to the Gmail API if the account has no App Passwords page, keeping the same tool.
+- **Checked:** in-process MCP client calls against a fake SMTP class (connect to 587, EHLO, STARTTLS, EHLO, login, send, quit), a failed login, missing credentials, and the real server started over stdio with no credentials (refuses, nothing sent).
+
+### D6.2 The tool's contract
+- **Decision:** `send_email(to, subject, body, references='', intended_recipient='')` returns `{status, to, message_id, date}` as structured content. Any problem raises `ToolError`, which reaches the client as an `is_error` result whose text starts with `not sent:`. references and intended_recipient are optional so Claude Code can call the tool with just to, subject and body.
+- **Why:** the pipeline needs a clear yes or no plus the outbound Message-ID for the ledger, and an LLM calling the tool needs a readable error. A bare `-> dict` gave only JSON text; `-> dict[str, str]` makes the SDK publish an output schema and fill structured_content.
+- **Checked:** both shapes seen from the client in the in-process test.
+
+### D6.3 Credentials come from the environment, then .env; never printed
+- **Decision:** the server reads GMAIL_ADDRESS and GMAIL_APP_PASSWORD from its environment, or else from `.env` in the repo root, found from the server file's own path. The spaces Google shows in an App Password are removed. Logs go to stderr and never contain the password; SMTP errors are passed on as the server's reply text.
+- **Why:** BUILD_PROMPT.md phase 6. `claude mcp add` can then register the server with no secrets on the command line. The mcp stdio client passes only a short list of safe variables (PATH, HOME, ...) to the server process, so the notifier forwards the two GMAIL variables when they're set in the shell.
+- **Checked:** the stdio test with no .env reports the missing settings by path, without contacting SMTP.
+
+### D6.4 Live notices go to NOTIFY_TO
+- **Decision:** in live mode every notice is sent to NOTIFY_TO (your own inbox). The real sender of the duplicate goes into X-Intended-Recipient and into the ledger's intended_recipient. The dry-run drafts are addressed to the real sender, as the template says.
+- **Why:** the Enron addresses aren't ours to email (and mostly no longer exist). The spec says to send to "an email address (preferably your own gmail account)".
+
+### D6.5 The ledger makes sends safe to repeat
+- **Decision:** before each send a `pending` row goes into notifications (committed). Afterwards it becomes `sent` (with the outbound Message-ID; the duplicate gets notification_sent=1 and notification_date) or `failed` (with the error). Groups with a `sent` row are skipped. Groups with a `pending` row are reported and never retried automatically. Groups whose rows are all `failed` are tried again. If the MCP call raises (no answer), the row stays pending with the error noted and the run stops. Every attempt is appended to output/send_log.csv (timestamp, recipient, subject, status, error).
+- **Why:** BUILD_PROMPT.md phase 6. A pending row from a crash may or may not have gone out, and retrying it could send a notice twice.
+- **Checked:** on a copy of enron.db with the in-process server and a fake SMTP: run 1 (limit 2) sent 2; run 2 skipped those and sent 2 more; a failed login left a `failed` row with notification_sent still 0; a planted pending row was reported and left alone while the failed group was retried and sent.
+
+### D6.6 One draft per flagged email, one live notice per group
+- **Decision:** the dry run writes one .eml for each of the 23,816 flagged duplicates, addressed to that duplicate's sender with References set to its Message-ID. Live mode sends one notice per duplicate group (12,762) about the group's latest duplicate (latest date, then highest message_id), at most `--limit` per run (default 3). Groups are taken in the report's order (original date, then message_id).
+- **Why:** the spec's deliverables ask for drafts "for all flagged duplicates" and for live notices "for each duplicate group ... the latest". The default limit stops a first live run from sending 12,762 emails.
+
+### D6.7 Draft format
+- **Decision:** each .eml is exactly the template: To, Subject, Date and References, a blank line, then the body with its blank lines and indentation. Lines end in LF. Date is the run time in RFC 2822 form (`Wed, 14 Oct 2026 07:46:20 +0000`). Date Sent shows the stored UTC ISO date, so it can be matched against duplicates_report.csv. The score drops trailing zeros (`100%`, `93.5%`). Control characters and line breaks in header text are replaced with spaces: 5 subjects contain `\x01`, and a line break would start a new header.
+- **Safe file names:** the Message-ID without `<>`, with anything other than letters, digits, `.`, `_` and `-` replaced by `_` (`22062940.1075845797850.JavaMail.evans_thyme.eml`). A repeat gets `_2`. output/replies/manifest.csv maps every file to its Message-ID. Old .eml files are removed before each dry run, so drafts for emails that are no longer flagged don't stay behind.

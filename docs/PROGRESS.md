@@ -16,8 +16,8 @@ The plan is in BUILD_PROMPT.md (phases 0 to 9). Rules for every session are in C
 | 2 | EDA (scripts/eda.py, src/markers.py, docs/EDA.md) | done | 93.2% mixed CRLF/LF; 11 cp1252; 1,165 quoted-printable; 0 bad dates, 84 bogus 1980 placeholders; 613 files without To; 13,025 copy groups; 1,281 Outlook forwards; 7 rule changes (D2.1-D2.11) | 7bbc2fd |
 | 3 | extraction (src/extractor.py) | done | 41,264 files: 40,651 parsed, 613 failed (all no To header); 11 cp1252, 1,165 quoted-printable, 1 header repair; body_basis 37,154 authored / 3,420 forwarded / 77 quoted; has_attachment 16.3%, headings 1.9%; dates 1980-01-01 (bogus) to 2002-07-12 | 770aaad |
 | 4 | database (schema.sql, src/database.py, sample_queries.sql) | done | load 1: 40,651 emails, 7,799 addresses, 179,245 recipient rows; load 2: 0 added, 40,651 skipped, 0 conflicts; FK and integrity checks clean | a0f9820 |
-| 5 | duplicates (src/dedup.py, duplicates_report.csv) | done | 9,081 sender+subject groups; 12,762 duplicate groups; 23,816 flagged (22,902 same-Date folder copies, 914 re-sends; 23,262 identical, 554 fuzzy); avg group 2.87, largest 51; 5,117 bodies under 50 chars; plain check 500 groups 0 mismatches | (next commit) |
-| 6 | notifications and MCP (src/notifier.py, mcp_server/gmail_server.py) | todo | | |
+| 5 | duplicates (src/dedup.py, duplicates_report.csv) | done | 9,081 sender+subject groups; 12,762 duplicate groups; 23,816 flagged (22,902 same-Date folder copies, 914 re-sends; 23,262 identical, 554 fuzzy); avg group 2.87, largest 51; 5,117 bodies under 50 chars; plain check 500 groups 0 mismatches | b70f74b |
+| 6 | notifications and MCP (src/notifier.py, mcp_server/gmail_server.py) | done | dry run: 23,816 .eml drafts + manifest in about 5s; live mode: 12,762 groups, ledger checked with a fake SMTP (sent/skip/failed/pending); stdio server refuses without credentials; --send-live never run | (next commit) |
 | 7 | main.py and tests | todo | | |
 | 8 | docs (README.md, AI_USAGE.md) | todo | | |
 | 9 | final check (fresh clone, deliverables, git history) | todo | | |
@@ -55,4 +55,9 @@ The plan is in BUILD_PROMPT.md (phases 0 to 9). Rules for every session are in C
 - `.venv/bin/python -m src.dedup --check` takes about 5s; it writes duplicates_report.csv (23,816 rows) and output/dedup_stats.txt, and refreshes the flags in one transaction.
 - Re-running gives a byte-identical report. The notifications table and notification_sent are untouched (0 and 0).
 - Comparing on body (the spec) vs body+forwarded vs raw_text: 23,816 / 24,101 / 24,513 flags. Kept body; the 78 re-send flags with a different forwarded payload are a known limitation (D5.1).
+
+### Phase 6
+- Never ran --send-live against Gmail. All live-mode checks used a copy of enron.db, the in-process server (`Client(gmail_server.mcp)`) and a fake SMTP class (scratch scripts; phase 7 turns them into pytest tests).
+- output/replies/*.eml change on every run (Date = now), so they're committed once, after the final from-scratch run in phase 7, not here.
+- mcp_config.json.example and .env.example hold placeholders only. .env and mcp_config.json are gitignored, and neither exists yet.
 

@@ -258,7 +258,7 @@ def parse_file(path, maildir):
         notes.append('multipart')
 
     record={}
-    record['message_id']=(common.header_value(headers, 'Message-ID') or '').strip()
+    record['message_id']=common.unfold(common.header_value(headers, 'Message-ID') or '').strip()
     record['raw_date']=common.header_value(headers, 'Date')
     record['date'], record['date_problem']=parse_date(record['raw_date'])
     senders=parse_addresses(common.header_value(headers, 'From'))
