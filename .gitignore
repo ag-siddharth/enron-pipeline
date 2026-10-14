@@ -1,0 +1,16 @@
+maildir
+*.tar.gz
+.venv/
+__pycache__/
+.pytest_cache/
+.DS_Store
+*.db
+.env
+mcp_config.json
+ASSIGNMENT.md
+*.docx
+output_dev/
+# sqlite side files left behind if a write crashes mid-transaction
+*.db-journal
+*.db-wal
+*.db-shm
