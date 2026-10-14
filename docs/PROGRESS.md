@@ -18,8 +18,8 @@ The plan is in BUILD_PROMPT.md (phases 0 to 9). Rules for every session are in C
 | 4 | database (schema.sql, src/database.py, sample_queries.sql) | done | load 1: 40,651 emails, 7,799 addresses, 179,245 recipient rows; load 2: 0 added, 40,651 skipped, 0 conflicts; FK and integrity checks clean | a0f9820 |
 | 5 | duplicates (src/dedup.py, duplicates_report.csv) | done | 9,081 sender+subject groups; 12,762 duplicate groups; 23,816 flagged (22,902 same-Date folder copies, 914 re-sends; 23,262 identical, 554 fuzzy); avg group 2.87, largest 51; 5,117 bodies under 50 chars; plain check 500 groups 0 mismatches | b70f74b |
 | 6 | notifications and MCP (src/notifier.py, mcp_server/gmail_server.py) | done | dry run: 23,816 .eml drafts + manifest in about 5s; live mode: 12,762 groups, ledger checked with a fake SMTP (sent/skip/failed/pending); stdio server refuses without credentials; --send-live never run | c69c464 |
-| 7 | main.py and tests | done | python main.py from scratch in 32s: 40,651 loaded, 23,816 flagged, 23,816 drafts; second run inserts 0, report byte-identical; 43 pytest tests pass in 0.5s | (next commit) |
-| 8 | docs (README.md, AI_USAGE.md) | todo | | |
+| 7 | main.py and tests | done | python main.py from scratch in 32s: 40,651 loaded, 23,816 flagged, 23,816 drafts; second run inserts 0, report byte-identical; 43 pytest tests pass in 0.5s | a9259b3 |
+| 8 | docs (README.md, AI_USAGE.md) | done | README: setup, MCP setup, run, every output, selection, EDA, decisions, limitations, final-run numbers; AI_USAGE: tools, 5 quoted prompts, 18 real fixes, MCP section; [TODO: me] left for % split, lessons, chat model, second LLM, screenshot | (next commit) |
 | 9 | final check (fresh clone, deliverables, git history) | todo | | |
 
 ## Notes per phase
@@ -65,4 +65,9 @@ The plan is in BUILD_PROMPT.md (phases 0 to 9). Rules for every session are in C
 - `python main.py` = extract + load + dedup + drafts, about 32s from scratch. `--only <mailbox>` uses dev.db and output_dev/ (fischer-m takes 1.5s). `--fresh` only works with `--only`. `--send-live` can't be combined with `--only`.
 - Tests: tests/test_extractor.py (21), test_dedup.py (8), test_database.py (4), test_notifier.py (10). They cover every case in BUILD_PROMPT.md phase 7 plus dates, splitting, attachments, headings, the header repair, the template, the ledger and the server.
 - The final outputs committed here come from the from-scratch run: error_log.txt, duplicates_report.csv, output/*.txt, output/replies/, output/send_log.csv (header only, nothing sent).
+
+### Phase 8
+- README.md and AI_USAGE.md use the numbers from the phase 7 from-scratch run. AI_USAGE.md is built only from scratch_notes.md, this file, the git history and BUILD_PROMPT.md.
+- Left for the user ([TODO: me] in AI_USAGE.md): the % split, lessons learned, the Claude chat model, which second LLM reviewed the plan, the actual Claude Code prompt and reply for send_email, real MCP setup issues, and the live-send screenshot and log line.
+- The Write tool's hook timed out on README.md twice, so README.md and AI_USAGE.md were written with shell heredocs.
 

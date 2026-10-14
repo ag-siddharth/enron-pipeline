@@ -25,3 +25,4 @@
 - Phase 6: the mcp stdio client passes only a short list of "safe" environment variables to the server process, so GMAIL_* exported in the shell would never reach it. The server reads .env next to itself, and the notifier forwards the two GMAIL variables explicitly.
 - Phase 7: all 43 tests passed on the first run, which proves little by itself. Broke the code on purpose to check they bite: an off-by-one at the 90 boundary, a failed send recorded as sent, and attaching to the newest original. The right test failed each time.
 - Phase 7: made sure tests can never send for real once .env exists. An autouse fixture swaps in a fake SMTP and blocks the subprocess server, so live-mode tests must use the in-process one.
+- Phase 8: the editor's Write tool timed out twice in a row on README.md (its hook didn't answer), so the file was written with a shell heredoc instead. Same content, just a different way to put it on disk.
