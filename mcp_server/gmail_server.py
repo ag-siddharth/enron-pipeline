@@ -66,8 +66,18 @@ def build_message(sender, to, subject, body, references, intended_recipient):
     return message
 
 
+def quit_quietly(server):
+    """Say QUIT, but never let a failing QUIT change whether the email was sent."""
+    try:
+        server.quit()
+    except Exception as e:
+        # gmail sometimes drops the connection at the end; just close our side
+        log.info('QUIT failed: %s: %s', type(e).__name__, e)
+        server.close()
+
+
 @mcp.tool()
-def send_email(to: str, subject: str, body: str, references: str = '', intended_recipient: str = '') -> dict[str, str]:
+def send_email(to: str, subject: str, body: str, references: str='', intended_recipient: str='') -> dict[str, str]:
     """Send a plain-text email through Gmail SMTP. references sets the References header and
     intended_recipient the X-Intended-Recipient header. Returns the status and the new Message-ID."""
     sender, password=load_credentials()
@@ -82,18 +92,23 @@ def send_email(to: str, subject: str, body: str, references: str = '', intended_
     log.info('sending to %s, subject %r', to, subject)
     try:
         server=smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30)
-        try:
-            server.ehlo()
-            server.starttls(context=ssl.create_default_context())
-            server.ehlo()
-            server.login(sender, password)
-            server.send_message(message)
-        finally:
-            server.quit()
+    except Exception as e:
+        log.info('send failed: %s: %s', type(e).__name__, e)
+        raise ToolError('not sent: %s: %s' % (type(e).__name__, e))
+    try:
+        server.ehlo()
+        server.starttls(context=ssl.create_default_context())
+        server.ehlo()
+        server.login(sender, password)
+        server.send_message(message)
     except Exception as e:
         # smtplib errors carry the server's reply, never the password
         log.info('send failed: %s: %s', type(e).__name__, e)
+        quit_quietly(server)
         raise ToolError('not sent: %s: %s' % (type(e).__name__, e))
+    # gmail has accepted the message now, so a failing QUIT must not report "not sent":
+    # the ledger would mark it failed and the next run would send it again (DECISIONS D6.9)
+    quit_quietly(server)
     log.info('sent, Message-ID %s', message['Message-ID'])
     return {'status': 'sent', 'to': to, 'message_id': message['Message-ID'], 'date': message['Date']}
 

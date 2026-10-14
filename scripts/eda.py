@@ -787,22 +787,62 @@ def write_rules_check(c, out):
     outlook_all=outlook_fw+c['outlook_subject'][('outlook_original_message', 'other subject')]
     out.append('## Rules checked against these numbers')
     out.append('')
-    rows=[
-        ['Only parse the real header block', 'X-To is in %s files; To is missing in %s' % (n(c['misc']['files with an X-To header']), n(c['mandatory'][('To missing', 'files')])), 'keep'],
-        ['Every file has its own Message-ID', '%s files, %s distinct fingerprints' % (n(total), n(s['distinct'])), 'keep: copies are matched by fingerprint'],
-        ['Bcc is a copy of Cc', '%s of %s Bcc headers equal Cc exactly' % (n(c['bcc']['Bcc exactly equal to Cc']), n(c['bcc']['emails with a Bcc header'])), 'keep: still stored, never scored'],
-        ['About 3% have no To:', '%s of %s files (%s)' % (n(c['mandatory'][('To missing', 'files')]), n(total), pct(c['mandatory'][('To missing', 'files')], total)), 'corrected: 1.5% of files here'],
-        ['Files use CRLF', '%s files mix CRLF headers with LF body lines' % n(c['line_endings']['CRLF header block, LF lines in the body']), 'corrected: convert CRLF to LF, keep LF'],
-        ['A few need cp1252', '%s cp1252, %s latin-1' % (n(c['encodings']['cp1252']), n(c['encodings']['latin-1'])), 'keep'],
-        ['Content-Type always text/plain', ', '.join(list(c['ctype'].keys())[:3]), 'keep, but %s files are quoted-printable and must be decoded before splitting' % n(c['cte']['quoted-printable'])],
-        ['Dates look like -0800 (PST)', '%s parse, %s fail; %s bogus 1979-12-31 placeholders' % (n(len(c['dates'])), n(len(c['bad_dates'])), n(c['years'][1980])), 'keep; bogus dates stay (they parse) and are called out'],
-        ['Outlook Original Message is a reply marker', '%s of %s first-marker Outlook blocks have an FW: subject' % (n(outlook_fw), n(outlook_all)), 'changed: FW: subject makes the block forwarded_content'],
-        ['Lotus reply blocks start "From: Name   date"', 'only %s files start that way; %s use name / date / To: lines and %s `Name <addr> on date`' % (n(c['first_marker']['lotus_from_date']), n(c['first_marker']['lotus_name_date_block']), n(c['first_marker']['lotus_name_on_date'])), 'extended: all three shapes count'],
-        ['> quoting is line by line', '%s files have > lines at column 0, %s more only after spaces' % (n(c['marker_files']['line starting with >']), n(c['marker_files']['line starting with spaces then >'])), 'keep column 0 only (indented > is mostly ASCII art and nested jokes)'],
-        ['has_attachment words in the sender\'s own text', '%s files have the words only outside the authored text' % n(c['attach_where']['attach word only outside the authored text']), 'keep; also count attaches/attaching/attachments'],
-        ['`<<file>>` placeholders', '%s files have them only in forwarded text, %s only in quoted replies' % (n(c['attach_where']['placeholder only in forwarded text']), n(c['attach_where']['placeholder only in quoted text'])), 'refined: count authored and forwarded text, not quoted replies'],
-        ['Headings: ALL CAPS, underlined, numbered', '%s / %s / %s raw candidates, %s / %s / %s kept' % (n(c['headings']['caps raw']), n(c['headings']['numbered raw']), n(c['headings']['underlined raw']), n(c['headings']['caps kept']), n(c['headings']['numbered kept']), n(c['headings']['underlined kept'])), 'refined: precision filters above'],
-    ]
+    # pull the numbers out first so every table row below stays one short line
+    to_missing=c['mandatory'][('To missing', 'files')]
+    x_to=c['misc']['files with an X-To header']
+    bcc_equal=c['bcc']['Bcc exactly equal to Cc']
+    bcc_all=c['bcc']['emails with a Bcc header']
+    mixed=c['line_endings']['CRLF header block, LF lines in the body']
+    cp1252=c['encodings']['cp1252']
+    latin1=c['encodings']['latin-1']
+    ctypes=', '.join(list(c['ctype'].keys())[:3])
+    qp=c['cte']['quoted-printable']
+    dates_ok=len(c['dates'])
+    dates_bad=len(c['bad_dates'])
+    bogus=c['years'][1980]
+    from_date=c['first_marker']['lotus_from_date']
+    name_block=c['first_marker']['lotus_name_date_block']
+    name_on=c['first_marker']['lotus_name_on_date']
+    gt_col0=c['marker_files']['line starting with >']
+    gt_spaces=c['marker_files']['line starting with spaces then >']
+    words_outside=c['attach_where']['attach word only outside the authored text']
+    in_forwarded=c['attach_where']['placeholder only in forwarded text']
+    in_quoted=c['attach_where']['placeholder only in quoted text']
+    heads=c['headings']
+    heads_raw='%s / %s / %s' % (n(heads['caps raw']), n(heads['numbered raw']), n(heads['underlined raw']))
+    heads_kept='%s / %s / %s' % (n(heads['caps kept']), n(heads['numbered kept']), n(heads['underlined kept']))
+
+    rows=[]
+    data='X-To is in %s files; To is missing in %s' % (n(x_to), n(to_missing))
+    rows.append(['Only parse the real header block', data, 'keep'])
+    data='%s files, %s distinct fingerprints' % (n(total), n(s['distinct']))
+    rows.append(['Every file has its own Message-ID', data, 'keep: copies are matched by fingerprint'])
+    data='%s of %s Bcc headers equal Cc exactly' % (n(bcc_equal), n(bcc_all))
+    rows.append(['Bcc is a copy of Cc', data, 'keep: still stored, never scored'])
+    data='%s of %s files (%s)' % (n(to_missing), n(total), pct(to_missing, total))
+    rows.append(['About 3% have no To:', data, 'corrected: 1.5% of files here'])
+    data='%s files mix CRLF headers with LF body lines' % n(mixed)
+    rows.append(['Files use CRLF', data, 'corrected: convert CRLF to LF, keep LF'])
+    data='%s cp1252, %s latin-1' % (n(cp1252), n(latin1))
+    rows.append(['A few need cp1252', data, 'keep'])
+    verdict='keep, but %s files are quoted-printable and must be decoded before splitting' % n(qp)
+    rows.append(['Content-Type always text/plain', ctypes, verdict])
+    data='%s parse, %s fail; %s bogus 1979-12-31 placeholders' % (n(dates_ok), n(dates_bad), n(bogus))
+    rows.append(['Dates look like -0800 (PST)', data, 'keep; bogus dates stay (they parse) and are called out'])
+    data='%s of %s first-marker Outlook blocks have an FW: subject' % (n(outlook_fw), n(outlook_all))
+    rows.append(['Outlook Original Message is a reply marker', data, 'changed: FW: subject makes the block forwarded_content'])
+    data='only %s files start that way; %s use name / date / To: lines' % (n(from_date), n(name_block))
+    data=data+' and %s `Name <addr> on date`' % n(name_on)
+    rows.append(['Lotus reply blocks start "From: Name   date"', data, 'extended: all three shapes count'])
+    data='%s files have > lines at column 0, %s more only after spaces' % (n(gt_col0), n(gt_spaces))
+    verdict='keep column 0 only (indented > is mostly ASCII art and nested jokes)'
+    rows.append(['> quoting is line by line', data, verdict])
+    data='%s files have the words only outside the authored text' % n(words_outside)
+    rows.append(['has_attachment words in the sender\'s own text', data, 'keep; also count attaches/attaching/attachments'])
+    data='%s files have them only in forwarded text, %s only in quoted replies' % (n(in_forwarded), n(in_quoted))
+    rows.append(['`<<file>>` placeholders', data, 'refined: count authored and forwarded text, not quoted replies'])
+    data=heads_raw+' raw candidates, '+heads_kept+' kept'
+    rows.append(['Headings: ALL CAPS, underlined, numbered', data, 'refined: precision filters above'])
     out=out+table(['Rule or hypothesis', 'Data', 'Verdict'], rows)
     out.append('')
     out.append('Details and reasons for every change are in docs/DECISIONS.md.')

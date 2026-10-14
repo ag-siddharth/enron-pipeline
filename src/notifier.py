@@ -19,6 +19,8 @@ SEND_LOG_COLUMNS=['timestamp', 'recipient', 'subject', 'status', 'error']
 # header text can't hold control characters or line breaks (a line break would start a new header);
 # 5 subjects here have \x01 where a dash used to be
 CONTROL_CHARS=re.compile(r'[\x00-\x08\x0a-\x1f\x7f]')
+# the export's null date (Mon, 31 Dec 1979 16:00:00 -0800) in UTC; 74 loaded emails have it
+PLACEHOLDER_DATE='1980-01-01T00:00:00+00:00'
 
 # the spec's template, word for word, from the first body line down
 BODY_TEMPLATE='''This is an automated notification from the Email Deduplication System.
@@ -147,6 +149,28 @@ def latest_per_group(conn):
     return result
 
 
+def is_resend(row):
+    """True if the group's latest duplicate was sent again later, not a same-Date folder copy."""
+    # a placeholder-dated original lost its real Date, so a later match is a copy too. the only
+    # such group (Your eThink Password) is one email exported from both Notes and Outlook
+    if row['original_date']==PLACEHOLDER_DATE:
+        return False
+    return row['date']!=row['original_date']
+
+
+def send_order(groups):
+    """Real re-sends first, then the folder copies, each kept in group order (DECISIONS D6.8)."""
+    # --limit only lets a few out per run, and a real re-send is the notice worth getting
+    resends=[]
+    copies=[]
+    for row in groups:
+        if is_resend(row):
+            resends.append(row)
+        else:
+            copies.append(row)
+    return resends+copies
+
+
 def ledger_state(conn):
     """group_key -> 'sent' or 'pending' from the ledger; failed-only groups can be tried again."""
     state={}
@@ -271,7 +295,10 @@ def send_live(conn, out_dir, limit, server=None):
     todo=[]
     already=0
     stuck=[]
-    for row in groups:
+    resends=0
+    for row in send_order(groups):
+        if is_resend(row):
+            resends+=1
         status=state.get(row['original_id'])
         if status=='sent':
             already+=1
@@ -279,7 +306,7 @@ def send_live(conn, out_dir, limit, server=None):
             stuck.append(row)
         else:
             todo.append(row)
-    print('groups: %d, already sent: %d, waiting: %d' % (len(groups), already, len(todo)))
+    print('groups: %d (%d real re-sends, sent first), already sent: %d, waiting: %d' % (len(groups), resends, already, len(todo)))
     for row in stuck:
         # a pending row means an earlier run stopped mid-send; check the Gmail sent folder by hand
         print('  left pending by an earlier run, not retried:', row['original_id'])

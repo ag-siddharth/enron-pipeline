@@ -3,8 +3,9 @@
 -- last pipeline run, refreshed by: .venv/bin/python scripts/run_sample_queries.py
 
 -- 1. Emails per sender, top 10
--- Expected: the five mailbox owners near the top, since their sent folders are in the subset. "emails"
--- counts every file (folder copies are separate rows), "contents" counts distinct fingerprints.
+-- Expected: four of the five mailbox owners at the top (Mann, Sanders, Shankman, Sager), since their sent
+-- folders are in the subset. The fifth, mary.fischer@enron.com, sent only 85 of these emails and ranks 36th.
+-- "emails" counts every file (folder copies are separate rows), "contents" counts distinct fingerprints.
 SELECT from_address, COUNT(*) AS emails, COUNT(DISTINCT fingerprint) AS contents
 FROM emails
 GROUP BY from_address

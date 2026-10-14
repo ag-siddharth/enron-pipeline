@@ -44,6 +44,7 @@ Why: in my first attempt the rules that went wrong (ranking by an average, count
 > I explored this dataset once before (notes in scratch_notes.md). Treat these as hypotheses for phases 1 to 3 to confirm or correct:
 > - Plain text search is a trap: "To:" also matches "X-To:", and Cc lines inside quoted replies look like real Cc. Only parse the real header block.
 > - Every file has its own Message-ID, even when it's a copy of the same email in another folder. In some mailboxes over half the files are such copies.
+> ...
 > - About 3% of emails have no To: header.
 
 Why: the exploration had found real traps, and the build had to know about them. But some notes were rough, so each one was framed as a hypothesis to test. Phases 1 and 2 confirmed some (one Message-ID per file; Bcc a copy of Cc in all 68,456 emails that have it) and corrected others (no To header in 1.5% of the picked files, not 3%; most files mix CRLF headers with LF bodies rather than being pure CRLF) (docs/PROGRESS.md, phases 1 and 2).
@@ -70,7 +71,7 @@ Why: duplicate detection is where a small ambiguity (chains, ties, float roundin
 
 Why: the email step is the one with real-world side effects. The prompt routes it through the MCP tool, redirects every live notice to my own inbox, makes repeated runs safe with a ledger, and keeps the AI's own testing fake.
 
-The prompt also fixes the code style ("Simple Python a student would write", "No spaces around = or comparison operators", `except Exception as e`), because that's how I write and I need to be able to follow and defend the code. Its `.venv` rule ("Always run .venv/bin/python") comes from the first attempt, where Claude Code used a different Python than my terminal (scratch_notes.md).
+The prompt also fixes the code style ("Simple Python a student would write", "No spaces around = or comparison operators", `except Exception as e`), because that's how I write, and the comments are meant to let me follow the code later. Its `.venv` rule ("Always run .venv/bin/python") comes from the first attempt, where Claude Code used a different Python than my terminal (scratch_notes.md).
 
 **[TODO: me: add any other prompts you used during the build, e.g. follow-ups after reading the phase summaries, and the exact Claude chat prompts if you saved them.]**
 
@@ -93,7 +94,7 @@ These are real cases where AI-written code or a planned rule didn't work at firs
 8. **Markers hidden by quoted-printable (phase 2).** Quoted-printable files end marker lines in `=20` (`-----Original Message-----=20`), so 37 Outlook markers were invisible until the body was decoded. Fixed by decoding before splitting.
 9. **A prompt rule the data disproved (phase 2).** "Outlook Original Message is a reply marker" was wrong for 1,281 of 3,740 such emails, which were FW: forwards (Outlook uses the same line for both). The rule changed: under an FW: subject the block is forwarded_content.
 10. **Noisy headings (phase 2).** The first heading rule mostly caught noise (`FYI`, initials like `JWVS`, `[IMAGE]`, `<<FILE.DOC>>`). Precision filters were added and the kept list was checked by eye.
-11. **Time zones silently becoming UTC (phase 3).** Python 3.13's `parsedate_tz` returns offset 0 for an unknown zone and for a date with no zone at all, so `XYZ` would quietly have become UTC. This was found by testing the library before writing the parser; the extractor now reads the zone itself and fails unknown zones.
+11. **Time zones silently becoming UTC (phase 3).** Python 3.13's `parsedate_tz` returns offset 0 for an unknown zone and for a date with no zone at all, so `XYZ` would quietly have become UTC. The extractor now reads the zone itself and fails unknown zones, as the build prompt asks.
 12. **Links counted as attachments (phase 3).** `<< File: mailto:cwoods@mayerbrown.com >>` set has_attachment. It's an Outlook link, so placeholders with mailto/http/www are skipped (41 of 7,015).
 13. **A transaction that would commit 40,000 times (phase 4, caught before the first run).** In Python's sqlite3 a SAVEPOINT outside a transaction starts one, so every RELEASE would have committed. Fixed with an explicit BEGIN.
 14. **Short notes hiding different forwards (phase 5).** A one-word note like "print" on a weekly report scores 100 against last week's "print". Comparing the full text instead flagged more emails, not fewer (24,513 vs 23,816), so the spec's rule stayed and the 78 likely false positives are documented as a limitation.

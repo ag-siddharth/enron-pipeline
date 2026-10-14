@@ -143,6 +143,30 @@ def test_limit_caps_the_sends(maildir, email, run_pipeline, out_dir, no_real_ema
     assert result['waiting']==1
 
 
+def test_real_resends_go_out_before_folder_copies(maildir, email, run_pipeline, out_dir, no_real_email):
+    root, write=maildir
+    # the oldest group: a placeholder-dated original and a later copy. its real Date was lost, so it's no re-send
+    write('p1', email(message_id='<p1@test>', date='Mon, 31 Dec 1979 16:00:00 -0800 (PST)', subject='password', body='your password'))
+    write('p2', email(message_id='<p2@test>', date='Mon, 11 Jun 2001 18:04:00 -0700 (PDT)', subject='password', body='your password'))
+    # next: the same email in two folders, same Date
+    write('c1', email(message_id='<c1@test>', subject='copy', body='same text in two folders'))
+    write('c2', email(message_id='<c2@test>', subject='copy', body='same text in two folders'))
+    # the newest group, but really sent again a day later with a small change
+    write('r1', email(message_id='<r1@test>', date='Tue, 15 May 2001 09:00:00 -0700 (PDT)', subject='resend', body='please sign the contract'))
+    write('r2', email(message_id='<r2@test>', date='Wed, 16 May 2001 09:00:00 -0700 (PDT)', subject='RE: resend', body='please sign the contract!'))
+    conn=run_pipeline()
+    # with --limit 1 the re-send goes first, although its group comes last in the report
+    assert notifier.send_live(conn, out_dir, 1, server=gmail_server.mcp)['sent']==1
+    assert ledger(conn)[0][:2]==('<r1@test>', '<r2@test>')
+    assert '97.96%' in no_real_email.sent[0].get_content()
+    # the rest follow in report order
+    notifier.send_live(conn, out_dir, 5, server=gmail_server.mcp)
+    order=[]
+    for row in ledger(conn):
+        order.append(row[1])
+    assert order==['<r2@test>', '<p2@test>', '<c2@test>']
+
+
 def test_no_notify_to_means_nothing_is_sent(maildir, email, run_pipeline, out_dir, no_real_email, monkeypatch):
     two_copies(maildir, email)
     conn=run_pipeline()
@@ -187,3 +211,20 @@ def test_server_reports_smtp_errors_without_the_password(no_real_email):
     assert result.is_error is True
     assert 'SMTPAuthenticationError' in result.content[0].text
     assert 'abcd' not in result.content[0].text
+
+
+def test_failed_quit_after_gmail_accepted_counts_as_sent(maildir, email, run_pipeline, out_dir, no_real_email):
+    # gmail took the message, then the connection dropped on QUIT
+    no_real_email.fail_quit=True
+    result=call_server({'to': 'me@example.com', 'subject': 'hi', 'body': 'x'})
+    assert result.is_error is False
+    assert result.structured_content['status']=='sent'
+    assert no_real_email.closed is True
+    # through the pipeline: marked sent, and a second run doesn't send it again
+    two_copies(maildir, email)
+    conn=run_pipeline()
+    assert notifier.send_live(conn, out_dir, 3, server=gmail_server.mcp)['sent']==1
+    assert ledger(conn)==[('<1@test>', '<2@test>', 'kay.mann@enron.com', 'me@example.com', 'sent')]
+    assert conn.execute("SELECT notification_sent FROM emails WHERE message_id='<2@test>'").fetchone()[0]==1
+    assert notifier.send_live(conn, out_dir, 3, server=gmail_server.mcp)['sent']==0
+    assert len(no_real_email.sent)==2

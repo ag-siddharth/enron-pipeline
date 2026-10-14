@@ -170,6 +170,7 @@ def stats_lines(groups, flags):
     same_date=0
     identical=0
     short=0
+    short_copies=0
     for duplicate, original, score in flags:
         key=original['message_id']
         members[key]=members.get(key, 1)+1
@@ -179,6 +180,9 @@ def stats_lines(groups, flags):
             identical+=1
         if len(compare_text(duplicate['body']))<SHORT_BODY:
             short+=1
+            # a short folder copy is harmless; a short re-send may hide a different forward (D5.1)
+            if duplicate['date']==original['date']:
+                short_copies+=1
     group_count=len(members)
     in_groups=sum(members.values())
     average=0.0
@@ -200,6 +204,7 @@ def stats_lines(groups, flags):
     lines.append('flagged with a later Date (real re-sends): %d' % (len(flags)-same_date))
     lines.append('flagged with identical text (score 100): %d, fuzzy 90-99.99: %d' % (identical, len(flags)-identical))
     lines.append('flagged with a body under %d characters: %d' % (SHORT_BODY, short))
+    lines.append('  of those, folder copies: %d, re-sends: %d' % (short_copies, short-short_copies))
     return lines
 
 

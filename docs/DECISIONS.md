@@ -197,7 +197,7 @@ All numbers are from docs/EDA.md (41,264 files in the 5 picked mailboxes).
   Longer texts flag more, not fewer: two forwards of the same big document with different notes look 90% alike, and replies in one thread share their quoted history.
 - **Considered:** the two other columns of the table, and an extra rule for short notes.
 - **Known limitation:** 78 of the 914 re-send flags have different forwarded content behind the same note, 63 of them with a note under 50 characters (`print`, `fyi`, `Please print.` on a recurring subject like "Freight weekly report"). Under the spec's definition those are duplicates, but a person would likely call them different emails. They're 0.3% of all flags, so the rule stays and the README lists it.
-- **Checked:** the stats print how many flags have a body under 50 characters (5,117; 4,899 of them are folder copies with the same Date).
+- **Checked:** the stats print how many flags have a body under 50 characters (5,117) and split them: 4,991 folder copies with the same Date and 126 re-sends. (An earlier version of this entry said 4,899 folder copies. That number measured the raw body length, but the 50-character test runs on the whitespace-collapsed text, which gives 4,991.)
 
 ### D5.2 Attach to the earliest original that scores 90+, never to a duplicate
 - **Decision:** each group is walked in (date, message_id) order. An email is compared only with the group's originals, earliest first, and attaches to the first one that scores 90 or more; otherwise it becomes a new original. duplicate_of always points at an original, and similarity_score is the score against that original.
@@ -216,6 +216,8 @@ All numbers are from docs/EDA.md (41,264 files in the 5 picked mailboxes).
 ### D5.5 Bogus 1980 dates barely matter
 - **Decision:** no special case.
 - **Why:** of the 74 parsed emails dated 1980-01-01, 17 are flagged against 1980 originals (folder copies of each other) and only 1 flag pairs a 1980 original with a later duplicate.
+- **That one flag:** `Your eThink Password` from ethink@enron.com, in sager-e as `all_documents/1211.` (Notes export, placeholder date) and `enron___general/1.` (Outlook export, 2001-06-12), score 100. It's one email whose Date was lost in the Notes export, so it's really a copy, but the stats count it as 1 of the 914 re-sends because the Dates differ. The matching stays as it is; live mode sends this group with the folder copies (D6.8), and the README lists it as a known limitation.
+- **Checked (audit):** the 84 placeholder files are 74 loaded plus 10 that fail for no To header. The first 18 rows of duplicates_report.csv have a 1980 original: the 17 copies and this one.
 
 ## Phase 6: notifications and MCP
 
@@ -245,12 +247,24 @@ All numbers are from docs/EDA.md (41,264 files in the 5 picked mailboxes).
 - **Checked:** on a copy of enron.db with the in-process server and a fake SMTP: run 1 (limit 2) sent 2; run 2 skipped those and sent 2 more; a failed login left a `failed` row with notification_sent still 0; a planted pending row was reported and left alone while the failed group was retried and sent.
 
 ### D6.6 One draft per flagged email, one live notice per group
-- **Decision:** the dry run writes one .eml for each of the 23,816 flagged duplicates, addressed to that duplicate's sender with References set to its Message-ID. Live mode sends one notice per duplicate group (12,762) about the group's latest duplicate (latest date, then highest message_id), at most `--limit` per run (default 3). Groups are taken in the report's order (original date, then message_id).
+- **Decision:** the dry run writes one .eml for each of the 23,816 flagged duplicates, addressed to that duplicate's sender with References set to its Message-ID. Live mode sends one notice per duplicate group (12,762) about the group's latest duplicate (latest date, then highest message_id), at most `--limit` per run (default 3). Groups are taken in the report's order (original date, then message_id), with real re-sends moved to the front (D6.8).
 - **Why:** the spec's deliverables ask for drafts "for all flagged duplicates" and for live notices "for each duplicate group ... the latest". The default limit stops a first live run from sending 12,762 emails.
 
 ### D6.7 Draft format
 - **Decision:** each .eml is exactly the template: To, Subject, Date and References, a blank line, then the body with its blank lines and indentation. Lines end in LF. Date is the run time in RFC 2822 form (`Wed, 14 Oct 2026 07:46:20 +0000`). Date Sent shows the stored UTC ISO date, so it can be matched against duplicates_report.csv. The score drops trailing zeros (`100%`, `93.5%`). Control characters and line breaks in header text are replaced with spaces: 5 subjects contain `\x01`, and a line break would start a new header.
+- **`Re: Re:` subjects:** the subject is `[Duplicate Notice] Re: <original_subject>`, taken literally, so an original subject that already starts with `Re:` gives `[Duplicate Notice] Re: Re: ...`. Stripping the extra prefix was considered, but the spec gives the template word for word and the original subject is meant to be kept as written (section 3.1, "Preserve Re:/Fwd: prefixes").
 - **Safe file names:** the Message-ID without `<>`, with anything other than letters, digits, `.`, `_` and `-` replaced by `_` (`22062940.1075845797850.JavaMail.evans_thyme.eml`). A repeat gets `_2`. output/replies/manifest.csv maps every file to its Message-ID. Old .eml files are removed before each dry run, so drafts for emails that are no longer flagged don't stay behind.
+
+### D6.8 Live mode sends real re-sends first
+- **Decision:** before the limit is applied, the groups are split into real re-sends and folder copies, each part kept in report order, and the re-sends go first. A group is a real re-send when its latest duplicate's Date is later than the original's and the original's Date isn't the 1980 placeholder (`is_resend` and `send_order` in src/notifier.py). That gives 452 re-send groups out of 12,762. The matching and the drafts are unchanged.
+- **Why:** `--limit` lets only a few notices out per run, and a notice about a real re-send is the useful one. In report order, `--limit 1` sent `TurboPark closing`, a 1980-dated folder copy at 100%. Ordering by date difference alone would still send a 1980-dated email first: the eThink group (D5.5) has the earliest original of all 453 groups with different Dates, and it's a copy whose Date was lost. With the placeholder rule the first notice is `Organizational Changes` (richard.sanders@enron.com, 1999-07-06, sent again 3 minutes later, score 99.98).
+- **Considered:** sorting by score so fuzzy matches go first (it would mix the order up for no clear gain); leaving report order (the demo notice would be a 1980 copy).
+- **Checked:** `test_real_resends_go_out_before_folder_copies` builds a placeholder group, a same-Date copy group and a re-send group, in that report order, and expects the re-send first, then the other two in report order. The test fails with the old order and also without the placeholder rule.
+
+### D6.9 A failing QUIT after Gmail accepted the message still counts as sent
+- **Decision:** `send_email` reports `not sent` only if connecting, STARTTLS, login or sending fails. QUIT runs afterwards, on its own; if it raises, it's logged to stderr, the socket is closed, and the result stays `sent`.
+- **Why:** the old code called QUIT in a `finally` inside the same `try`, so a dropped connection at the very end turned a delivered notice into `not sent`. The ledger would mark it `failed`, and the next run would send it again.
+- **Checked:** `test_failed_quit_after_gmail_accepted_counts_as_sent` makes the fake SMTP raise `SMTPServerDisconnected` on QUIT. The tool returns `sent`, and through the pipeline the ledger row is `sent`, notification_sent is 1, and a second run sends nothing. The test fails against the old server code.
 
 ## Phase 7: main.py and tests
 

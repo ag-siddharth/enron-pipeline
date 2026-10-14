@@ -17,6 +17,8 @@ class FakeSMTP:
     """Stands in for smtplib.SMTP and keeps what would have been sent."""
     sent=[]
     fail_login=False
+    fail_quit=False
+    closed=False
 
     def __init__(self, host, port, timeout=None):
         self.host=host
@@ -36,7 +38,12 @@ class FakeSMTP:
         FakeSMTP.sent.append(message)
 
     def quit(self):
-        pass
+        # like gmail dropping the connection after it has already accepted the message
+        if FakeSMTP.fail_quit:
+            raise smtplib.SMTPServerDisconnected('Connection unexpectedly closed')
+
+    def close(self):
+        FakeSMTP.closed=True
 
 
 @pytest.fixture(autouse=True)
@@ -44,6 +51,8 @@ def no_real_email(monkeypatch, tmp_path):
     """Every test gets the fake smtp, fake settings and no .env, so nothing can ever reach gmail."""
     FakeSMTP.sent=[]
     FakeSMTP.fail_login=False
+    FakeSMTP.fail_quit=False
+    FakeSMTP.closed=False
     monkeypatch.setattr(smtplib, 'SMTP', FakeSMTP)
     monkeypatch.setattr(gmail_server, 'ENV_FILE', str(tmp_path / 'missing.env'))
     monkeypatch.setattr(notifier, 'ENV_FILE', str(tmp_path / 'missing.env'))

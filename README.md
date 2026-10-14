@@ -8,7 +8,7 @@ One command runs everything and never sends email unless asked:
 .venv/bin/python main.py
 ```
 
-Results of the final run (5 mailboxes, about 32 seconds from scratch):
+Results of the final run (5 mailboxes, about 32 to 38 seconds from scratch):
 
 | Stage | Result |
 |---|---|
@@ -16,7 +16,7 @@ Results of the final run (5 mailboxes, about 32 seconds from scratch):
 | Load | 40,651 emails, 7,799 addresses, 179,245 recipient rows; a second load adds 0 |
 | Duplicates | 12,762 duplicate groups, 23,816 emails flagged (22,902 same-Date folder copies, 914 re-sends) |
 | Notices | 23,816 draft .eml files; live mode can send one notice per group (12,762) |
-| Tests | 43 pytest tests, about 0.5 seconds, no dataset needed |
+| Tests | 45 pytest tests, about 0.6 seconds, no dataset needed |
 
 ## Contents
 
@@ -99,7 +99,7 @@ If the dataset is somewhere else, link it instead: `ln -s /path/to/maildir maild
 | `.venv/bin/python main.py --send-live --limit 1` | send at most 1 notice this run |
 | `.venv/bin/python main.py --only fischer-m` | run one mailbox into `dev.db` and `output_dev/` (both gitignored), so the real outputs are never overwritten |
 | `.venv/bin/python main.py --only fischer-m --fresh` | the same, deleting `dev.db` first |
-| `.venv/bin/python -m pytest` | the 43 tests (made-up emails, no dataset, no network) |
+| `.venv/bin/python -m pytest` | the 45 tests (made-up emails, no dataset, no network) |
 
 `--fresh` only works with `--only`, and `--send-live` can't be combined with `--only`. Both refusals protect the send ledger in `enron.db`. Running `main.py` again is safe: emails already in the database are skipped and the duplicate flags are recomputed. To rebuild `enron.db` from scratch, delete it yourself (that also deletes the record of notices already sent).
 
@@ -109,8 +109,8 @@ Other scripts:
 |---|---|
 | `.venv/bin/python scripts/select_mailboxes.py` | scans all 150 mailboxes and writes `output/selection_manifest.csv` (about 2 minutes) |
 | `.venv/bin/python scripts/eda.py` | surveys the 5 picked mailboxes and writes `docs/EDA.md` (about 25 seconds) |
-| `.venv/bin/python -m src.extractor` | extraction stats only, no database |
-| `.venv/bin/python -m src.dedup --check` | re-runs duplicate detection and compares the fast matcher with the plain every-pair one on 500 groups |
+| `.venv/bin/python -m src.extractor` | extraction stats only, no database. It also rewrites `error_log.txt` |
+| `.venv/bin/python -m src.dedup --check` | re-runs duplicate detection and compares the fast matcher with the plain every-pair one on 500 groups. It also rewrites `duplicates_report.csv`, `output/dedup_stats.txt` and the duplicate flags in `enron.db` |
 | `.venv/bin/python scripts/run_sample_queries.py` | runs `sample_queries.sql` against `enron.db` and refreshes the output comments in it |
 
 ## Output files
@@ -126,7 +126,7 @@ Other scripts:
 | `output/extraction_stats.txt` | files found, parsed and failed by reason; fallback encodings; field coverage; first markers; date range |
 | `output/load_stats.txt` | inserted and skipped counts, table sizes before and after |
 | `output/load_log.txt` | Message-ID conflicts and insert failures (none in the final run) |
-| `output/dedup_stats.txt` | groups, flags, average group size, folder copies vs re-sends, short bodies |
+| `output/dedup_stats.txt` | groups, flags, average group size, folder copies vs re-sends, short bodies (also split into folder copies and re-sends) |
 | `output/selection_manifest.csv` | every mailbox with its selection numbers and why it was or wasn't picked |
 | `schema.sql`, `sample_queries.sql` | the schema, and sample queries with their real output |
 
@@ -160,6 +160,8 @@ The tool sends through `smtp.gmail.com` port 587 with STARTTLS. It sets `Date`, 
 
 - **Recipient override:** every live notice goes to `NOTIFY_TO`, not to the Enron sender, because those addresses aren't ours to email. The real sender is kept in the `X-Intended-Recipient` header and in the ledger's `intended_recipient` column. The dry-run drafts are addressed to the real senders, exactly as the template says.
 - One notice per duplicate group, about the group's latest duplicate, at most `--limit` per run (default 3). The run prints how many groups are still waiting.
+- **Real re-sends go first (D6.8).** The 452 groups whose latest duplicate has a later Date than its original are sent before the 12,310 same-Date folder copies, each part in report order. A group whose original carries the 1980 placeholder date counts as a copy (see Known limitations). So `--limit 1` sends `Organizational Changes` from richard.sanders@enron.com (sent again 3 minutes later, score 99.98) rather than a 1980-dated copy at 100%.
+- If Gmail accepts a notice and the connection then fails at the very end (QUIT), it still counts as sent, so the next run doesn't send it twice (D6.9).
 - A `pending` ledger row is written before each send and updated to `sent` or `failed` afterwards. Groups already sent are skipped. Failed groups are tried again next run. A row left `pending` by a crash is reported and never retried automatically, since the notice may already have gone out; check the Gmail Sent folder and fix that row by hand.
 - On success the duplicate's `notification_sent` and `notification_date` are set, and every attempt is appended to `output/send_log.csv`.
 - **The CONFIRM reply in the template isn't processed.** Nothing reads replies, so answering CONFIRM changes nothing in the database.
@@ -208,16 +210,18 @@ Every rule has a one-line reason in the code and a full entry (what, why, altern
 - **Dates (D3.1).** Converted to UTC ISO 8601, reading the zone in our own code, because Python 3.13's `parsedate_tz` treats an unknown zone as UTC.
 - **Attachments (D2.7, D3.6).** Evidence comes from MIME parts, `<<file>>` placeholders in authored or forwarded text (forwards carry attachments, replies drop them, links don't count), or attach words in the sender's own text. Each email stores its evidence.
 - **Duplicates (D5.1 to D5.3).** Same sender and normalized subject, then rapidfuzz Indel similarity of at least 90 on the body, decided on the whole-number distance. Identical texts skip the fuzzy step, and pairs too different in length are skipped. Each email attaches to the earliest original only, so chains don't spread. A plain every-pair version agrees on 500 sampled groups.
-- **Safe sending (D6.4 to D6.6, D7.1).** There's a ledger with pending/sent/failed, a recipient override, a send limit, and flags that refuse to touch the real ledger from dev runs. Tests swap in a fake SMTP and can't start the real server.
+- **Safe sending (D6.4 to D6.9, D7.1).** There's a ledger with pending/sent/failed, a recipient override, a send limit, real re-sends sent first, and flags that refuse to touch the real ledger from dev runs. Tests swap in a fake SMTP and can't start the real server.
 
 ## Known limitations
 
-- **Short notes can hide different forwards.** Duplicates are judged on the body, as the spec says. 78 of the 914 re-send flags share only a short note (`print`, `fyi`) while the forwarded content behind it differs, so a person would call them different emails. Comparing the full text instead flags more, not fewer (24,513 vs 23,816), so the rule stays (D5.1).
+- **Short notes can hide different forwards.** Duplicates are judged on the body, as the spec says. 78 of the 914 re-send flags share only a short note (`print`, `fyi`) while the forwarded content behind it differs, so a person would call them different emails. Comparing the full text instead flags more, not fewer (24,513 vs 23,816), so the rule stays (D5.1). In all, 5,117 flagged emails have a body under 50 characters: 4,991 are folder copies (harmless, the same file in another folder) and 126 are re-sends, which is where these false positives hide.
 - **One person, two addresses.** Duplicate grouping is by from_address, so Richard Sanders as `richard.sanders@enron.com` and as `b..sanders@enron.com` are two senders.
 - **Most flags are folder copies.** 22,902 of the 23,816 flags are copies of the same email in other folders (same Date), not re-sends. Both match the spec's definition; the report tells them apart by comparing the two dates.
 - **Heading rules are heuristics.** Most kept headings are real (`TABLE OF CONTENTS`, `3. Litigation and Other Contingencies`), but some noise stays (`MV SALVADOR CP 11.05.00`), and underlined headings are rare (5).
 - **Some reply text stays in the body.** `wrote:` attribution lines stay in the body (92 files), and `>` lines indented with spaces aren't treated as quotes (80 files, mostly ASCII art).
-- **Bogus dates are kept.** The 84 placeholder dates (1980-01-01 UTC) parse, so they're kept and sort first.
+- **Bogus dates are kept.** 84 files carry the export's null date, `Mon, 31 Dec 1979 16:00:00 -0800 (PST)` (1980-01-01 UTC). It parses, so they're kept: 74 are in the database and the other 10 fail for having no To header. They sort first, so the first 18 rows of `duplicates_report.csv` have a 1980 original: 17 folder copies that are dated 1980 too, and the eThink email below.
+- **One placeholder-dated original looks like a re-send.** `Your eThink Password` from ethink@enron.com is in sager-e twice: `all_documents/1211.` from the Notes export, with the placeholder date, and `enron___general/1.` from the Outlook export, dated 2001-06-12. It's one email whose Date was lost, but because the two Dates differ it counts as 1 of the 914 re-sends. The matching is left alone (D5.5); live mode sends it with the folder copies (D6.8).
+- **`Re: Re:` in notice subjects.** The template's subject is `[Duplicate Notice] Re: <original_subject>`, and we follow it literally, so an original subject that already starts with `Re:` gives `[Duplicate Notice] Re: Re: ...` (D6.7).
 - **Loading never updates rows.** A repeated Message-ID is skipped, so extractor changes only reach the database after deleting `enron.db`, which also deletes the send ledger.
 - **Drafts are rewritten every run.** Each run regenerates all drafts with a new Date (the template's `<current_timestamp>`).
 - **CONFIRM replies aren't processed.**

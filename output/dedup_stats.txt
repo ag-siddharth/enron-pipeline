@@ -6,3 +6,4 @@ flagged with the same Date as their original (folder copies): 22902
 flagged with a later Date (real re-sends): 914
 flagged with identical text (score 100): 23262, fuzzy 90-99.99: 554
 flagged with a body under 50 characters: 5117
+  of those, folder copies: 4991, re-sends: 126

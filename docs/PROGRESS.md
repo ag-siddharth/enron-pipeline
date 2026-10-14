@@ -21,6 +21,7 @@ The plan is in BUILD_PROMPT.md (phases 0 to 9). Rules for every session are in C
 | 7 | main.py and tests | done | python main.py from scratch in 32s: 40,651 loaded, 23,816 flagged, 23,816 drafts; second run inserts 0, report byte-identical; 43 pytest tests pass in 0.5s | a9259b3 |
 | 8 | docs (README.md, AI_USAGE.md) | done | README: setup, MCP setup, run, every output, selection, EDA, decisions, limitations, final-run numbers; AI_USAGE: tools, 5 quoted prompts, 18 real fixes, MCP section; [TODO: me] left for % split, lessons, chat model, second LLM, screenshot | b202f10 |
 | 9 | final check (fresh clone, deliverables, git history) | done | fresh clone + fresh venv from requirements.txt (pip freeze identical): main.py same numbers, 43 tests pass, outputs byte-identical apart from draft Dates; every section 7 deliverable tracked; .env, mcp_config.json, *.db, maildir never in history | 381d9a3 |
+| 10 | audit fixes (review against ASSIGNMENT.md) | done | 45 tests pass; a failed QUIT after Gmail accepted counts as sent; live order: 452 real re-send groups first, first notice "Organizational Changes" (99.98); short bodies 5,117 = 4,991 copies + 126 re-sends; 84 placeholder files = 74 loaded + 10 failed, 1 re-send group with a placeholder original (eThink); docs/EDA.md byte-identical after the eda.py rewrite; other outputs byte-identical, dedup_stats.txt gains one line | (next commit) |
 
 ## Notes per phase
 
@@ -77,3 +78,10 @@ The plan is in BUILD_PROMPT.md (phases 0 to 9). Rules for every session are in C
 - `git log --all --name-only` has never listed .env, mcp_config.json, any .db file, maildir, ASSIGNMENT.md or .venv. The examples hold placeholders only.
 - All phases are done. What's left is for the user (see README.md "Gmail MCP server setup" and the [TODO: me] parts of AI_USAGE.md): App Password and .env, claude mcp add, one live send, screenshots, the TODOs, git push.
 
+
+### Phase 10 (audit fixes, after the build)
+- A full audit against ASSIGNMENT.md (counts, spot checks, MCP stdout, git history, style, docs) found no spec failures. The fixes here are the small issues it found, done with the user's go-ahead.
+- Code: QUIT handling in mcp_server/gmail_server.py (D6.9), live send order in src/notifier.py (`is_resend`, `send_order`, D6.8), the short-body split in the dedup stats, `str=''` defaults in send_email, the rules table in scripts/eda.py split into short lines. Two new tests; each fails when its fix is removed.
+- Docs: query 1's Expected note, three AI_USAGE.md wordings, README (test count, 32 to 38 seconds, side effects of `-m src.extractor` and `--check`, re-sends first, QUIT, short-body split, placeholder dates, the eThink case, `Re: Re:`), DECISIONS D5.1 (4,899 corrected to 4,991), D5.5, D6.6, D6.7, D6.8, D6.9.
+- Outputs: `python main.py` re-run; duplicates_report.csv, error_log.txt, extraction_stats.txt, load_log.txt, manifest.csv, send_log.csv, selection_manifest.csv and docs/EDA.md are byte-identical to the phase 9 commit. output/dedup_stats.txt gains the short-body split line. The drafts and load_stats.txt were restored to the phase 9 from-scratch run (re-running only changes the drafts' Date lines and makes load_stats say "inserted: 0").
+- Still for the user: App Password and .env, claude mcp add, one live send, screenshots, the [TODO: me] parts of AI_USAGE.md, git push.
