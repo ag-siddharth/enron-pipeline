@@ -181,3 +181,38 @@ All numbers are from docs/EDA.md (41,264 files in the 5 picked mailboxes).
 ### D4.6 Indexes and sample query outputs
 - **Decision:** indexes on date, from_address and subject (the spec), (from_address, normalized_subject) for task 3's grouping, fingerprint (not unique), duplicate_of, email_recipients.address_id and notifications.group_key. The outputs in sample_queries.sql are written by `scripts/run_sample_queries.py`, which runs each query against enron.db and replaces the comment under it.
 - **Why:** the "real output" can't drift from the database if a script writes it. EXPLAIN QUERY PLAN (query 2c) shows the date range query using idx_emails_date.
+
+## Phase 5: duplicates
+
+### D5.1 Compare the body field, as the spec says
+- **Decision:** two emails in a sender+subject group are compared on `body` with whitespace collapsed. That's the sender's own text, or the forwarded/quoted fallback for pure forwards (D3.4).
+- **Why:** the spec defines a duplicate on "body content", and body is the field the spec separates from forwarded and quoted content. Measured on the real data with three choices of comparison text:
+
+  | Compared text | Flagged | Re-sends (later Date) |
+  |---|---|---|
+  | body (chosen) | 23,816 | 914 |
+  | body + forwarded_content | 24,101 | 1,843 |
+  | raw_text (everything) | 24,513 | 2,787 |
+
+  Longer texts flag more, not fewer: two forwards of the same big document with different notes look 90% alike, and replies in one thread share their quoted history.
+- **Considered:** the two other columns of the table, and an extra rule for short notes.
+- **Known limitation:** 78 of the 914 re-send flags have different forwarded content behind the same note, 63 of them with a note under 50 characters (`print`, `fyi`, `Please print.` on a recurring subject like "Freight weekly report"). Under the spec's definition those are duplicates, but a person would likely call them different emails. They're 0.3% of all flags, so the rule stays and the README lists it.
+- **Checked:** the stats print how many flags have a body under 50 characters (5,117; 4,899 of them are folder copies with the same Date).
+
+### D5.2 Attach to the earliest original that scores 90+, never to a duplicate
+- **Decision:** each group is walked in (date, message_id) order. An email is compared only with the group's originals, earliest first, and attaches to the first one that scores 90 or more; otherwise it becomes a new original. duplicate_of always points at an original, and similarity_score is the score against that original.
+- **Why:** BUILD_PROMPT.md phase 5. It also stops chains (A~B and B~C don't make C a duplicate of A unless C itself scores 90+ against A). Originals are pairwise under 90 by construction, because a later one would have attached to an earlier one.
+- **Checked:** no duplicate is dated before its original and no original is itself flagged (both 0 in SQL). Running dedup twice gives a byte-identical duplicates_report.csv (same md5).
+
+### D5.3 The 90 is decided on whole numbers
+- **Decision:** ratio >= 90 is tested as `10*distance <= m+n`, with rapidfuzz `Indel.distance(a, b, score_cutoff=(m+n)//10)`. Identical texts score 100 with no fuzzy call, and pairs with `20*min(m,n) < 9*(m+n)` are skipped because the ratio can't reach 90. The stored score is `100*(m+n-d)/(m+n)` rounded to 2 decimals.
+- **Why:** BUILD_PROMPT.md phase 5. A float near 90.0 could round either way; the integer test can't. The real data has a pair at exactly 90.0 (`Re: Enron Center Garage`, sample query 4b).
+- **Checked:** `--check` runs a plain version (full Indel distance for every pair, no shortcuts) on 500 random groups of up to 40 emails (1,798 emails): 0 mismatches. The full run takes about 5s.
+
+### D5.4 Empty subjects form groups too
+- **Decision:** an empty normalized subject is a group key like any other.
+- **Why:** the spec's rule is "same subject after normalizing", and two empty subjects are the same. The body test still decides. The biggest candidate groups are empty-subject ones (kay.mann@enron.com: 809 emails, 242 distinct contents).
+
+### D5.5 Bogus 1980 dates barely matter
+- **Decision:** no special case.
+- **Why:** of the 74 parsed emails dated 1980-01-01, 17 are flagged against 1980 originals (folder copies of each other) and only 1 flag pairs a 1980 original with a later duplicate.

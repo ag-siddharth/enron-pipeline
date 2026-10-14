@@ -1,0 +1,8 @@
+sender+subject groups with 2+ emails: 9081 (38093 emails)
+duplicate groups found (an original plus 1+ duplicates): 12762
+emails flagged as duplicates: 23816
+average duplicate group size: 2.87 (largest 51)
+flagged with the same Date as their original (folder copies): 22902
+flagged with a later Date (real re-sends): 914
+flagged with identical text (score 100): 23262, fuzzy 90-99.99: 554
+flagged with a body under 50 characters: 5117

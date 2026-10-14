@@ -15,8 +15,8 @@ The plan is in BUILD_PROMPT.md (phases 0 to 9). Rules for every session are in C
 | 1 | mailbox selection (scripts/select_mailboxes.py, src/common.py) | done | 150 mailboxes, 517,401 files, 0 read errors; picked sanders-r, mann-k, sager-e, shankman-j, fischer-m = 41,264 files, 17,903 distinct (matches the earlier run) | e984d4f |
 | 2 | EDA (scripts/eda.py, src/markers.py, docs/EDA.md) | done | 93.2% mixed CRLF/LF; 11 cp1252; 1,165 quoted-printable; 0 bad dates, 84 bogus 1980 placeholders; 613 files without To; 13,025 copy groups; 1,281 Outlook forwards; 7 rule changes (D2.1-D2.11) | 7bbc2fd |
 | 3 | extraction (src/extractor.py) | done | 41,264 files: 40,651 parsed, 613 failed (all no To header); 11 cp1252, 1,165 quoted-printable, 1 header repair; body_basis 37,154 authored / 3,420 forwarded / 77 quoted; has_attachment 16.3%, headings 1.9%; dates 1980-01-01 (bogus) to 2002-07-12 | 770aaad |
-| 4 | database (schema.sql, src/database.py, sample_queries.sql) | done | load 1: 40,651 emails, 7,799 addresses, 179,245 recipient rows; load 2: 0 added, 40,651 skipped, 0 conflicts; FK and integrity checks clean | (next commit) |
-| 5 | duplicates (src/dedup.py, duplicates_report.csv) | todo | | |
+| 4 | database (schema.sql, src/database.py, sample_queries.sql) | done | load 1: 40,651 emails, 7,799 addresses, 179,245 recipient rows; load 2: 0 added, 40,651 skipped, 0 conflicts; FK and integrity checks clean | a0f9820 |
+| 5 | duplicates (src/dedup.py, duplicates_report.csv) | done | 9,081 sender+subject groups; 12,762 duplicate groups; 23,816 flagged (22,902 same-Date folder copies, 914 re-sends; 23,262 identical, 554 fuzzy); avg group 2.87, largest 51; 5,117 bodies under 50 chars; plain check 500 groups 0 mismatches | (next commit) |
 | 6 | notifications and MCP (src/notifier.py, mcp_server/gmail_server.py) | todo | | |
 | 7 | main.py and tests | todo | | |
 | 8 | docs (README.md, AI_USAGE.md) | todo | | |
@@ -50,4 +50,9 @@ The plan is in BUILD_PROMPT.md (phases 0 to 9). Rules for every session are in C
 - enron.db (gitignored) is in the repo root, 191 MB. The load takes about 23s.
 - `scripts/run_sample_queries.py` refreshes the outputs in sample_queries.sql. Queries 4a/4b (duplicates) show 0 rows until phase 5 has run, so refresh them after dedup.
 - Two loads in a row: run 1 inserted 40,651; run 2 inserted 0 and skipped 40,651 with no conflicts; all table counts unchanged.
+
+### Phase 5
+- `.venv/bin/python -m src.dedup --check` takes about 5s; it writes duplicates_report.csv (23,816 rows) and output/dedup_stats.txt, and refreshes the flags in one transaction.
+- Re-running gives a byte-identical report. The notifications table and notification_sent are untouched (0 and 0).
+- Comparing on body (the spec) vs body+forwarded vs raw_text: 23,816 / 24,101 / 24,513 flags. Kept body; the 78 re-send flags with a different forwarded payload are a known limitation (D5.1).
 

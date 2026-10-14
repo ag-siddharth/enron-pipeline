@@ -129,8 +129,10 @@ JOIN emails o ON o.message_id=d.duplicate_of
 WHERE d.is_duplicate=1
 GROUP BY kind
 ORDER BY kind DESC;
--- Output (0 rows):
+-- Output (2 rows):
 -- kind | flagged | avg_score
+-- same Date (folder copy) | 22902 | 100.0
+-- different Date (re-send) | 914 | 98.42
 
 -- 4b. Duplicates joined to their originals, the least similar ones first
 -- Expected: scores between 90 and 100, every duplicate dated on or after its original
@@ -140,8 +142,18 @@ JOIN emails o ON o.message_id=d.duplicate_of
 WHERE d.is_duplicate=1
 ORDER BY d.similarity_score, d.date, d.message_id
 LIMIT 10;
--- Output (0 rows):
+-- Output (10 rows):
 -- duplicate_date | original_date | similarity_score | from_address | subject
+-- 2001-05-06T13:10:00+00:00 | 2001-04-11T06:47:00+00:00 | 90.0 | richard.sanders@enron.com | Re: Enron Center Garage
+-- 2001-05-06T13:10:00+00:00 | 2001-04-11T06:47:00+00:00 | 90.0 | richard.sanders@enron.com | Re: Enron Center Garage
+-- 2001-11-26T22:07:22+00:00 | 2001-10-25T22:44:07+00:00 | 90.04 | enron_update@concureworkplace.com | <<Concur Expense Document>> - Jeff Shankman
+-- 2001-10-25T12:13:17+00:00 | 2001-10-08T15:44:09+00:00 | 90.41 | enron-admin@fsddatasvc.com | TIME SENSITIVE: Executive Impact & Influence Program Survey
+-- 2001-10-29T13:27:53+00:00 | 2001-10-08T15:44:09+00:00 | 90.41 | enron-admin@fsddatasvc.com | TIME SENSITIVE: Executive Impact & Influence Program Survey
+-- 2001-12-14T15:53:23+00:00 | 2001-12-14T15:32:14+00:00 | 90.5 | kay.mann@enron.com | RE: Opinions
+-- 2001-05-01T18:40:00+00:00 | 2001-05-01T17:17:00+00:00 | 90.57 | isabel.parker@freshfields.com | RE: GE Legal Opinion
+-- 2001-05-01T18:40:00+00:00 | 2001-05-01T17:17:00+00:00 | 90.57 | isabel.parker@freshfields.com | RE: GE Legal Opinion
+-- 2000-12-08T20:54:00+00:00 | 2000-12-06T04:59:00+00:00 | 90.62 | ospbc@egroups.com | [OSPBC] New file uploaded to OSPBC
+-- 2000-12-08T20:54:00+00:00 | 2000-12-06T04:59:00+00:00 | 90.62 | ospbc@egroups.com | [OSPBC] New file uploaded to OSPBC
 
 -- 5a. Contents (fingerprints) that appear in more than one folder
 -- Expected: thousands, because Outlook and Notes keep the same email in several folders
