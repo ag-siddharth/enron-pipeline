@@ -6,9 +6,9 @@ How AI tools were used to build this project. Everything below comes from `scrat
 
 | Tool | Version | Used for |
 |---|---|---|
-| Claude (chat) | **[TODO: me: model]** | analysis, exploring the dataset, planning, and drafting `BUILD_PROMPT.md` |
+| Claude (chat, claude.ai) | Claude Opus 5.5 | analysis, exploring the dataset, planning, and drafting `BUILD_PROMPT.md` |
 | Claude Code | 2.1.295 (`claude --version`), model Claude Opus 5.5 (`claude-opus-5-5`), as recorded in docs/PROGRESS.md phase 0 | reviewing and fixing my first exploration scripts, then building this whole repository from `BUILD_PROMPT.md` (every phase in one session) |
-| A second LLM | **[TODO: me: which one]** | reviewed the plan before the build **[TODO: me: what it changed]** |
+| Claude (a second, separate chat) | claude.ai | reviewed the plan before the build and produced the "Final Reviewed Roadmap", which compares the two approaches |
 
 Every commit in this repository was made by Claude Code during the build and ends with `Co-Authored-By: Claude Opus 5.5`.
 
@@ -141,7 +141,15 @@ A small custom server, `mcp_server/gmail_server.py`, built on the official MCP P
 ### How the AI tool was prompted to use send_email
 
 - The pipeline's own use was specified in BUILD_PROMPT.md phase 6 (prompt 5 above): `main.py --send-live` starts the server over stdio with the `mcp` Python client and calls `send_email` once per duplicate group. It sends to NOTIFY_TO with `intended_recipient` set to the real sender and `references` set to the duplicate's Message-ID.
-- Testing the tool from Claude Code, with a prompt like this: *"Use the gmail MCP server's send_email tool to send an email to your.name@gmail.com with the subject 'MCP test' and the body 'Testing send_email from Claude Code.' Then tell me the Message-ID it returned."* **[TODO: me: paste the prompt you actually used and Claude Code's reply.]**
+- Testing the tool directly from Claude Code, after registering the server with `claude mcp add`. The prompt I used:
+
+  > Use the send_email tool from the gmail MCP server to send a test email to agsid4799@gmail.com with the subject "MCP test from Claude Code" and the body "Sent through the custom Gmail MCP server." Show me the tool's response.
+
+  The tool's response:
+
+  ```json
+  {"status":"sent","to":"agsid4799@gmail.com","message_id":"<179202975984.15182.11432060340305608863@gmail.com>","date":"Thu, 15 Oct 2026 02:02:39 +0000"}
+  ```
 
 ### Issues during MCP setup and sending
 
@@ -149,8 +157,19 @@ A small custom server, `mcp_server/gmail_server.py`, built on the official MCP P
 - The bare `dict` return type gave no structured result (item 16).
 - The stdio client filters environment variables (item 17).
 - The build was never allowed to send real email (a stop condition), so the server and the live-mode ledger were tested with an in-process MCP client against a fake SMTP connection. The cases were: a successful send, a failed login, missing credentials, a pending row left by a crash, and the send limit. The real server was also started over stdio with no credentials to confirm it refuses without touching SMTP (docs/PROGRESS.md, phase 6).
-- **[TODO: me: any issue from the real setup: App Password, `claude mcp add`, the first live send.]**
+- **App Password with spaces.** The first test send failed with `SMTPServerDisconnected: Connection unexpectedly closed`. `nc -vz smtp.gmail.com 587` showed the network was fine. The cause was the App Password in `.env`, which still had the spaces Google shows when it displays the password. After removing them, the send worked.
+- **A typo in NOTIFY_TO.** The first live send (`python main.py --send-live --limit 1`) went to `agsid4799@gmail.comDid`, because a stray word had been typed into `NOTIFY_TO` in `.env`. Gmail accepted it, so `output/send_log.csv` records it as `sent`, but that address doesn't exist and the notice never arrived. After fixing `.env`, the second live send ("[Duplicate Notice] Re: NERC--Pls review ASAP", score 99.05%) arrived in my inbox. Lesson: `sent` in the log means Gmail accepted the email, not that it was delivered.
 
 ### Proof of a successful live send
 
-**[TODO: me: screenshot in docs/screenshots/ (the email in the NOTIFY_TO inbox, or the Claude Code tool call), plus the matching line from output/send_log.csv.]**
+The notice from the second live send, received in my inbox:
+
+![Duplicate notice received in the NOTIFY_TO inbox](docs/screenshots/pipeline-live-send.png)
+
+The two data rows in `output/send_log.csv`. The first is the send to the mistyped address (logged as `sent` but never delivered, see above); the second is the notice in the screenshot.
+
+```
+timestamp,recipient,subject,status,error
+2026-10-15T02:09:42+00:00,agsid4799@gmail.comDid,[Duplicate Notice] Re: Organizational Changes,sent,
+2026-10-15T02:12:38+00:00,agsid4799@gmail.com,[Duplicate Notice] Re: NERC--Pls review ASAP,sent,
+```

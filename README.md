@@ -122,7 +122,7 @@ Other scripts:
 | `duplicates_report.csv` | every flagged email: duplicate_message_id, original_message_id, subject, from_address, duplicate_date, original_date, similarity_score (23,816 rows) |
 | `output/replies/*.eml` | one draft notice per flagged email, in the spec's template, addressed to its sender (23,816 files) |
 | `output/replies/manifest.csv` | which .eml file belongs to which Message-ID |
-| `output/send_log.csv` | every live send attempt: timestamp, recipient, subject, status, error. Only the header row until `--send-live` is used. |
+| `output/send_log.csv` | every live send attempt: timestamp, recipient, subject, status, error. It holds the two live sends from phase 11 (docs/PROGRESS.md): the first went to a mistyped NOTIFY_TO and never arrived, the second arrived. `sent` means Gmail accepted the email, not that it was delivered. |
 | `output/extraction_stats.txt` | files found, parsed and failed by reason; fallback encodings; field coverage; first markers; date range |
 | `output/load_stats.txt` | inserted and skipped counts, table sizes before and after |
 | `output/load_log.txt` | Message-ID conflicts and insert failures (none in the final run) |
