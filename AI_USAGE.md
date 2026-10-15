@@ -1,6 +1,6 @@
 # AI usage
 
-How AI tools were used to build this project. Everything below comes from `scratch_notes.md` (which covers my earlier exploration), `docs/PROGRESS.md`, the git history and `BUILD_PROMPT.md`. Parts only I can fill in are marked **[TODO: me]**.
+How AI tools were used to build this project. Everything below comes from `scratch_notes.md` (which covers my earlier exploration), `docs/PROGRESS.md`, the git history, `BUILD_PROMPT.md` and my Claude chat history. The sections on the % split, lessons learned, my own contributions and the other prompts I used were drafted with Claude chat from what actually happened in this project, then checked and edited by me.
 
 ## Tools used
 
@@ -73,7 +73,12 @@ Why: the email step is the one with real-world side effects. The prompt routes i
 
 The prompt also fixes the code style ("Simple Python a student would write", "No spaces around = or comparison operators", `except Exception as e`), because that's how I write, and the comments are meant to let me follow the code later. Its `.venv` rule ("Always run .venv/bin/python") comes from the first attempt, where Claude Code used a different Python than my terminal (scratch_notes.md).
 
-**[TODO: me: add any other prompts you used during the build, e.g. follow-ups after reading the phase summaries, and the exact Claude chat prompts if you saved them.]**
+Besides the build prompt, these are the prompts that shaped the project:
+
+- **The decision that changed the design** (first attempt): "Good review, thanks. Here's what I've decided, please update the selection script (analyze_mailboxes.py): 1. A "copy" is a file with the same From, To, Cc, Date, Subject and body (ignore whitespace differences) as another file. Build a fingerprint from those instead of using Message-ID..." I made the decision myself and gave exact rules, so Claude Code implemented my choice instead of picking one.
+- **The audit:** "Do a thorough check of this project against @ASSIGNMENT.md. Don't change any code or docs and don't commit. Just run things and report..." It had to show evidence for every requirement and check that the numbers add up, and it wasn't allowed to change anything, so the result was a report I could trust.
+- **The fixes:** "Do all of 5 to 11, with these additions..." I approved specific fixes and attached conditions (a test for each code fix, outputs that stay byte-identical), which kept the scope under my control.
+- **The MCP evidence:** "Fill in the MCP evidence in AI_USAGE.md. Leave the % split and lessons learned for me. Use only these facts..." I gave it only facts I had verified, so it couldn't invent anything.
 
 ## Iterations and debugging
 
@@ -106,7 +111,13 @@ These are real cases where AI-written code or a planned rule didn't work at firs
 
 ## What I wrote vs. what AI wrote
 
-**[TODO: me: rough percentage split.]**
+I didn't hand-write the final pipeline code; Claude Code wrote it. What I did myself:
+
+- In a first, exploratory attempt, I wrote and ran an early mailbox-analysis script with Claude chat's help, and questioned results that looked wrong: 100% mandatory coverage everywhere, and a ranking that picked mailboxes with 0% forwarded and quoted emails. Both turned out to be real bugs.
+- Once the design had settled, I decided to restart from scratch with one build prompt, so the final code follows one consistent plan.
+- I reviewed every plan and report before approving it, chose which audit fixes to apply, and asked to keep the scope to what I can explain.
+- I did the Gmail and MCP setup myself (App Password, .env, registering the server) and worked through both send problems.
+- I checked the received notice against the template in the spec.
 
 What the sources show:
 
@@ -115,11 +126,18 @@ What the sources show:
 - **Decided by me, implemented by AI:** the push-back on ranking by average (scratch_notes.md).
 - **Proposed by AI from measurements:** the rule changes logged in docs/DECISIONS.md (for example the FW: rule, the header repair, the time zone check).
 
-**[TODO: me: which parts you reviewed line by line, rewrote or wrote yourself.]**
+- **Code:** nearly 100% AI-written. Claude Code wrote everything in src/, mcp_server/, scripts/ and tests/. The early script I wrote during exploration isn't part of the final code.
+- **Decisions and design:** roughly half and half. The AI measured the data and proposed options; I chose between them, pushed back when results looked wrong, and set the rules in the prompts.
+- **Setup, verification and debugging:** mostly me: the environment, the Gmail and MCP setup, running the checks, and fixing the two send problems.
+- **Docs:** mostly AI-written from my notes, the progress log and git history. I wrote these sections and checked the rest.
 
 ## Lessons learned
 
-**[TODO: me]**
+- "It ran" isn't the same as "it's right". The first selection script showed 100% coverage because "To:" also matched "X-To:", and only checking the numbers caught it.
+- Measure the data before designing. Per-file Message-IDs and folder copies (over half the files in some mailboxes) changed how duplicates had to be handled.
+- A second, independent review was worth it: it caught that merging copies before Task 3 went against the spec.
+- Prompts worked best with exact rules, expected numbers and clear stop conditions. Vague prompts gave plausible but unchecked results.
+- Small configuration details caused the real failures: spaces in the App Password, and a stray word in .env. And "sent" in a log only means Gmail accepted the email, not that it arrived.
 
 ## MCP integration
 
