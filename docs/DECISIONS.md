@@ -280,7 +280,7 @@ All numbers are from docs/EDA.md (41,264 files in the 5 picked mailboxes).
 ### D7.3 Tests can't send email
 - **Decision:** an autouse fixture in tests/conftest.py replaces smtplib.SMTP with a fake, sets fake Gmail settings, points both .env lookups at a missing file, and makes `notifier.stdio_server` raise, so live-mode tests have to use the in-process server.
 - **Why:** BUILD_PROMPT.md says never send a real email. Once you create .env, a test that started the real server as a subprocess would read it and could send for real.
-- **Checked:** 43 tests pass in under a second with no maildir. Breaking the code on purpose made the matching test fail each time: `distance>=limit` at the 90 boundary, a failed send recorded as sent, and attaching to the newest original instead of the earliest.
+- **Checked:** 43 tests passed at phase 7 (45 after phase 10), in under a second with no maildir. Breaking the code on purpose made the matching test fail each time: `distance>=limit` at the 90 boundary, a failed send recorded as sent, and attaching to the newest original instead of the earliest.
 
 ### D7.4 Drafts are committed once, after the final run
 - **Decision:** output/replies/ (23,816 .eml files plus manifest.csv) is committed from the final from-scratch run only.

@@ -89,8 +89,8 @@ The plan is in BUILD_PROMPT.md (phases 0 to 9). Rules for every session are in C
 
 ### Phase 11 (live MCP sends, done by the user)
 - The user created the App Password and .env and registered the server with `claude mcp add`.
-- Test from Claude Code: send_email to the user's own address returned `{"status":"sent", ...}` with a Gmail Message-ID, dated Thu, 15 Oct 2026 02:02:39 +0000. The first try had failed with `SMTPServerDisconnected`; `nc -vz smtp.gmail.com 587` was fine, and the cause was the spaces Google shows in the App Password. Removing them fixed it.
+- Test from Claude Code: send_email to the user's own address returned `{"status":"sent", ...}` with a Gmail Message-ID, dated Thu, 15 Oct 2026 02:02:39 +0000. The first try had failed with `SMTPServerDisconnected`; `nc -vz smtp.gmail.com 587` was fine, and re-entering the App Password without spaces fixed it (the server already strips normal spaces, so the exact cause is unclear).
 - Live send 1 (02:09:42 UTC, `main.py --send-live --limit 1`): "[Duplicate Notice] Re: Organizational Changes" went to `agsid4799@gmail.comDid`, because a stray word was typed into NOTIFY_TO. Gmail accepted it, so the log and ledger say `sent`, but the address doesn't exist and it never arrived. The ledger marks that group as sent, so later runs won't resend it.
 - Live send 2 (02:12:38 UTC, after fixing .env): "[Duplicate Notice] Re: NERC--Pls review ASAP" (score 99.05) arrived in the user's inbox. Screenshot in docs/screenshots/pipeline-live-send.png.
 - `sent` means Gmail accepted the email, not that it was delivered.
-- Still for the user: the [TODO: me] parts of AI_USAGE.md, git push.
+- Still for the user: git push.

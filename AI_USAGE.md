@@ -6,11 +6,11 @@ How AI tools were used to build this project. Everything below comes from `scrat
 
 | Tool | Version | Used for |
 |---|---|---|
-| Claude (chat, claude.ai) | Claude Opus 5.5 | analysis, exploring the dataset, planning, and drafting `BUILD_PROMPT.md` |
-| Claude Code | 2.1.295 (`claude --version`), model Claude Opus 5.5 (`claude-opus-5-5`), as recorded in docs/PROGRESS.md phase 0 | reviewing and fixing my first exploration scripts, then building this whole repository from `BUILD_PROMPT.md` (every phase in one session) |
+| Claude (chat, claude.ai) | Claude Opus 5.5 | analysis, exploring the dataset, planning, drafting `BUILD_PROMPT.md`, and helping debug the live sends |
+| Claude Code | 2.1.295 (`claude --version`), model Claude Opus 5.5 (`claude-opus-5-5`), as recorded in docs/PROGRESS.md phase 0 | reviewing and fixing my first exploration scripts, then building this whole repository from `BUILD_PROMPT.md` (phases 0 to 9 in one session, then the audit, the fixes and the live-send docs) |
 | Claude (a second, separate chat) | claude.ai | reviewed the plan before the build and produced the "Final Reviewed Roadmap", which compares the two approaches |
 
-Every commit in this repository was made by Claude Code during the build and ends with `Co-Authored-By: Claude Opus 5.5`.
+Every commit in this repository was made through Claude Code and ends with `Co-Authored-By: Claude Opus 5.5`.
 
 ## Prompting strategy
 
@@ -75,7 +75,7 @@ The prompt also fixes the code style ("Simple Python a student would write", "No
 
 Besides the build prompt, these are the prompts that shaped the project:
 
-- **The decision that changed the design** (first attempt): "Good review, thanks. Here's what I've decided, please update the selection script (analyze_mailboxes.py): 1. A "copy" is a file with the same From, To, Cc, Date, Subject and body (ignore whitespace differences) as another file. Build a fingerprint from those instead of using Message-ID..." I made the decision myself and gave exact rules, so Claude Code implemented my choice instead of picking one.
+- **The decision that changed the design** (first attempt): "Good review, thanks. Here's what I've decided, please update the selection script (analyze_mailboxes.py): 1. A "copy" is a file with the same From, To, Cc, Date, Subject and body (ignore whitespace differences) as another file. Build a fingerprint from those instead of using Message-ID..." The fingerprint idea came from Claude Code's review; I decided the exact fields and gave them as rules, so it implemented my definition.
 - **The audit:** "Do a thorough check of this project against @ASSIGNMENT.md. Don't change any code or docs and don't commit. Just run things and report..." It had to show evidence for every requirement and check that the numbers add up, and it wasn't allowed to change anything, so the result was a report I could trust.
 - **The fixes:** "Do all of 5 to 11, with these additions..." I approved specific fixes and attached conditions (a test for each code fix, outputs that stay byte-identical), which kept the scope under my control.
 - **The MCP evidence:** "Fill in the MCP evidence in AI_USAGE.md. Leave the % split and lessons learned for me. Use only these facts..." I gave it only facts I had verified, so it couldn't invent anything.
@@ -89,7 +89,7 @@ These are real cases where AI-written code or a planned rule didn't work at firs
 1. **Text search counted X-To as To.** The first selection script searched the whole file as text, so `To:` also matched `X-To:` and every mailbox showed 100% mandatory coverage. Fixed by parsing only the header block with the `email` module; real coverage was about 96 to 99%, and the gap was missing To: lines.
 2. **A bare `except: pass` swallowed Ctrl+C**, so the script couldn't be stopped. Fixed with `except Exception` (now a rule in CLAUDE.md and BUILD_PROMPT.md).
 3. **Ranking by the average picked the wrong mailboxes.** Ranking by the average of the optional fields chose mailboxes with 0% forwarded or quoted content. I pushed back, and the ranking switched to the weakest field.
-4. **"Unique" counted files, not emails.** Claude Code's review found that every file has its own Message-ID, so over half of some mailboxes were copies of the same email in other folders. Switched to a content fingerprint and re-picked the 5 mailboxes (17,903 distinct).
+4. **"Unique" counted files, not emails.** Claude Code's review found that every file has its own Message-ID, so over half of some mailboxes were copies of the same email in other folders. Switched to a content fingerprint and re-picked the 5 mailboxes (17,903 distinct). The plan then was to merge copies at ingestion. The second review of the plan pointed out that this would hide them from Task 3, so every file is loaded as its own row and flagged instead (D4.1).
 5. **Wrong Python.** Claude Code used a different Python than my terminal and stubbed out tqdm. Fixed with a `.venv` and a CLAUDE.md rule to always use `.venv/bin/python`.
 6. **zsh and `#` comments.** Shell commands with `#` comments broke in zsh (it doesn't skip them by default) and created junk folders.
 
@@ -113,23 +113,26 @@ These are real cases where AI-written code or a planned rule didn't work at firs
 
 I didn't hand-write the final pipeline code; Claude Code wrote it. What I did myself:
 
-- In a first, exploratory attempt, I wrote and ran an early mailbox-analysis script with Claude chat's help, and questioned results that looked wrong: 100% mandatory coverage everywhere, and a ranking that picked mailboxes with 0% forwarded and quoted emails. Both turned out to be real bugs.
+- In a first, exploratory attempt, Claude chat wrote an early mailbox-analysis script. I ran it, made small edits, debugged it and questioned results that looked wrong: 100% mandatory coverage everywhere, and a ranking that picked mailboxes with 0% forwarded and quoted emails. Both turned out to be real bugs.
 - Once the design had settled, I decided to restart from scratch with one build prompt, so the final code follows one consistent plan.
 - I reviewed every plan and report before approving it, chose which audit fixes to apply, and asked to keep the scope to what I can explain.
-- I did the Gmail and MCP setup myself (App Password, .env, registering the server) and worked through both send problems.
+- I did the Gmail and MCP setup myself (App Password, .env, registering the server) and fixed both send problems in .env, with Claude chat helping diagnose them.
 - I checked the received notice against the template in the spec.
 
 What the sources show:
 
 - **AI-written:** all code in this repository (src/, scripts/, mcp_server/, main.py, tests/, schema.sql, sample_queries.sql) and the docs (README.md, docs/), written by Claude Code during the build. Every commit carries the Claude co-author line.
 - **Mine (with Claude chat's help drafting it):** `BUILD_PROMPT.md`: the phase plan, stop conditions, decision rules, code style, selection rules and thresholds, the hypotheses, and the template and safety rules for sending. The first section of `scratch_notes.md` is my own record of the first attempt.
-- **Decided by me, implemented by AI:** the push-back on ranking by average (scratch_notes.md).
+- **My calls:** measuring all 150 mailboxes instead of picking well-known names; pushing back when the ranking picked mailboxes with 0% forwarded and quoted emails, which led to ranking by the weakest field; asking for the recheck that found the X-To bug; restarting from one build prompt; getting a second, separate Claude chat to review the plan, which caught that merging copies would hide them from Task 3 (D4.1); and freezing the scope so I can explain everything.
+- **AI suggestions I approved:** defining a copy by content fingerprint, the audit fixes and their conditions, and sending real re-sends first in live mode.
 - **Proposed by AI from measurements:** the rule changes logged in docs/DECISIONS.md (for example the FW: rule, the header repair, the time zone check).
 
-- **Code:** nearly 100% AI-written. Claude Code wrote everything in src/, mcp_server/, scripts/ and tests/. The early script I wrote during exploration isn't part of the final code.
+Rough split by area:
+
+- **Code:** nearly 100% AI-written. Claude Code wrote everything in src/, mcp_server/, scripts/ and tests/. The early mailbox script from the exploration (written by Claude chat, then run, edited and debugged by me) isn't part of the final code.
 - **Decisions and design:** roughly half and half. The AI measured the data and proposed options; I chose between them, pushed back when results looked wrong, and set the rules in the prompts.
-- **Setup, verification and debugging:** mostly me: the environment, the Gmail and MCP setup, running the checks, and fixing the two send problems.
-- **Docs:** mostly AI-written from my notes, the progress log and git history. I wrote these sections and checked the rest.
+- **Verification and debugging:** shared. Claude Code ran the checks in every phase, the tests and the fresh-clone check, and found and fixed items 7 to 19. I caught the two wrong results in the first attempt, asked for the full audit, did the Gmail and MCP setup, and fixed both send problems, with Claude chat helping diagnose them.
+- **Docs:** mostly AI-written from my notes, the progress log and git history. I drafted these sections with Claude chat and edited them, and checked the rest.
 
 ## Lessons learned
 
@@ -137,7 +140,7 @@ What the sources show:
 - Measure the data before designing. Per-file Message-IDs and folder copies (over half the files in some mailboxes) changed how duplicates had to be handled.
 - A second, independent review was worth it: it caught that merging copies before Task 3 went against the spec.
 - Prompts worked best with exact rules, expected numbers and clear stop conditions. Vague prompts gave plausible but unchecked results.
-- Small configuration details caused the real failures: spaces in the App Password, and a stray word in .env. And "sent" in a log only means Gmail accepted the email, not that it arrived.
+- Small configuration details caused the real failures: how the App Password was pasted into .env, and a stray word in NOTIFY_TO. And "sent" in a log only means Gmail accepted the email, not that it arrived.
 
 ## MCP integration
 
@@ -175,8 +178,8 @@ A small custom server, `mcp_server/gmail_server.py`, built on the official MCP P
 - The bare `dict` return type gave no structured result (item 16).
 - The stdio client filters environment variables (item 17).
 - The build was never allowed to send real email (a stop condition), so the server and the live-mode ledger were tested with an in-process MCP client against a fake SMTP connection. The cases were: a successful send, a failed login, missing credentials, a pending row left by a crash, and the send limit. The real server was also started over stdio with no credentials to confirm it refuses without touching SMTP (docs/PROGRESS.md, phase 6).
-- **App Password with spaces.** The first test send failed with `SMTPServerDisconnected: Connection unexpectedly closed`. `nc -vz smtp.gmail.com 587` showed the network was fine. The cause was the App Password in `.env`, which still had the spaces Google shows when it displays the password. After removing them, the send worked.
-- **A typo in NOTIFY_TO.** The first live send (`python main.py --send-live --limit 1`) went to `agsid4799@gmail.comDid`, because a stray word had been typed into `NOTIFY_TO` in `.env`. Gmail accepted it, so `output/send_log.csv` records it as `sent`, but that address doesn't exist and the notice never arrived. After fixing `.env`, the second live send ("[Duplicate Notice] Re: NERC--Pls review ASAP", score 99.05%) arrived in my inbox. Lesson: `sent` in the log means Gmail accepted the email, not that it was delivered.
+- **App Password.** The first test send failed with `SMTPServerDisconnected: Connection unexpectedly closed`. On Claude chat's suggestion I ran `nc -vz smtp.gmail.com 587`, which showed the network was fine. I re-entered the App Password in `.env` as 16 characters with no spaces, and the next send worked. The server already strips normal spaces, so the real problem was probably something else in how the password was first pasted; I didn't pin it down.
+- **A typo in NOTIFY_TO.** The first live send (`python main.py --send-live --limit 1`) went to `agsid4799@gmail.comDid`, because a stray word had been typed into `NOTIFY_TO` in `.env`. Claude chat spotted the bad address in the send output. Gmail accepted it, so `output/send_log.csv` records it as `sent`, but that address doesn't exist and the notice never arrived. After fixing `.env`, the second live send ("[Duplicate Notice] Re: NERC--Pls review ASAP", score 99.05%) arrived in my inbox. Lesson: `sent` in the log means Gmail accepted the email, not that it was delivered.
 
 ### Proof of a successful live send
 
